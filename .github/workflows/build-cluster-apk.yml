@@ -82,4 +82,4 @@ jobs:
             app/build/outputs/apk/github/debug/*.apk
           draft: false
           prerelease: false
-# Trigger v4.0.0-cluster2 build
+# Build v4.0.0-cluster2 release
