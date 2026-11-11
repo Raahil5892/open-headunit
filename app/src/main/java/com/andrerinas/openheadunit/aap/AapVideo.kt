@@ -400,7 +400,8 @@ internal class AapClusterVideo {
     }
 
     private var messageBuffer = ByteBuffer.allocate(INITIAL_BUFFER_BYTES)
-    private val assembler = VideoFragmentAssembler()
+    private var assembling = false
+    private var assemblingIsConfig = false
 
     private fun findStartCode(buf: ByteArray, offset: Int, len: Int): Int {
         if (offset + 3 > len) return -1
@@ -416,15 +417,33 @@ internal class AapClusterVideo {
         return sc > 0 && len > offset + sc
     }
 
+    /**
+     * Any non-control message on Channel.ID_CLU with type 0 (MEDIA_MESSAGE_DATA) or
+     * type 1 (MEDIA_MESSAGE_CODEC_CONFIG) is cluster media payload and must be handled
+     * here (and ACKed when type == 0 completes) rather than falling through to AapControl.
+     */
     fun isPayload(message: AapMessage): Boolean {
-        val buf = message.data
-        val len = message.size
-        return VideoFragmentAssembler.isPayload(
-            flags = message.flags.toInt(),
-            type = message.type,
-            payloadStartsAt10 = payloadStartsAt(buf, VideoFragmentAssembler.OFFSET_TIMESTAMP_INDICATION, len),
-            payloadStartsAt2 = payloadStartsAt(buf, VideoFragmentAssembler.OFFSET_MEDIA_INDICATION, len)
-        )
+        val flags = message.flags.toInt()
+        if ((flags and AapMessageFraming.FLAG_BIT_CONTROL) != 0) return false
+        return message.type in 0..1
+    }
+
+    private fun resolveInitialOffset(buf: ByteArray, len: Int, type: Int): Int {
+        if (type == 1) {
+            return VideoFragmentAssembler.OFFSET_MEDIA_INDICATION
+        }
+        // type == 0 (AV_MEDIA_WITH_TIMESTAMP has 2-byte type + 8-byte timestamp = offset 10)
+        if (payloadStartsAt(buf, VideoFragmentAssembler.OFFSET_TIMESTAMP_INDICATION, len)) {
+            return VideoFragmentAssembler.OFFSET_TIMESTAMP_INDICATION
+        }
+        if (payloadStartsAt(buf, VideoFragmentAssembler.OFFSET_MEDIA_INDICATION, len)) {
+            return VideoFragmentAssembler.OFFSET_MEDIA_INDICATION
+        }
+        return if (len > VideoFragmentAssembler.OFFSET_TIMESTAMP_INDICATION) {
+            VideoFragmentAssembler.OFFSET_TIMESTAMP_INDICATION
+        } else {
+            VideoFragmentAssembler.OFFSET_MEDIA_INDICATION
+        }
     }
 
     private fun ensureCapacity(additionalBytes: Int): Boolean {
@@ -442,61 +461,67 @@ internal class AapClusterVideo {
     fun process(message: AapMessage): Boolean {
         val buf = message.data
         val len = message.size
-        val flags = message.flags.toInt()
+        val flags = message.flags.toInt() and 0x0f
+        if ((flags and AapMessageFraming.FLAG_BIT_CONTROL) != 0 || message.type !in 0..1) {
+            return false
+        }
         val isConfig = message.type == 1
 
-        val decision = assembler.onMessage(
-            flags = flags,
-            type = message.type,
-            payloadStartsAt10 = payloadStartsAt(buf, VideoFragmentAssembler.OFFSET_TIMESTAMP_INDICATION, len),
-            payloadStartsAt2 = payloadStartsAt(buf, VideoFragmentAssembler.OFFSET_MEDIA_INDICATION, len)
-        )
-
-        return when (val action = decision.action) {
-            is VideoFragmentAssembler.Action.DecodeWhole -> {
+        return when (flags) {
+            VideoFragmentAssembler.FLAG_SINGLE -> {
+                assembling = false
                 messageBuffer.clear()
-                val nalLen = len - action.payloadOffset
-                com.andrerinas.openheadunit.decoder.video.ClusterVideoServer.getInstance()
-                    .onClusterH264Frame(buf, action.payloadOffset, nalLen, isConfig)
+                val offset = resolveInitialOffset(buf, len, message.type)
+                val nalLen = len - offset
+                if (nalLen > 0) {
+                    com.andrerinas.openheadunit.decoder.video.ClusterVideoServer.getInstance()
+                        .onClusterH264Frame(buf, offset, nalLen, isConfig)
+                }
                 true
             }
-            is VideoFragmentAssembler.Action.BeginAssembly -> {
+            VideoFragmentAssembler.FLAG_FIRST -> {
                 messageBuffer.clear()
-                val bytes = len - action.payloadOffset
-                if (ensureCapacity(bytes)) {
-                    messageBuffer.put(buf, action.payloadOffset, bytes)
+                val offset = resolveInitialOffset(buf, len, message.type)
+                val bytes = len - offset
+                if (bytes > 0 && ensureCapacity(bytes)) {
+                    messageBuffer.put(buf, offset, bytes)
+                    assembling = true
+                    assemblingIsConfig = isConfig
                 } else {
+                    assembling = false
                     messageBuffer.clear()
                 }
                 true
             }
-            VideoFragmentAssembler.Action.Append -> {
-                if (ensureCapacity(len)) {
+            VideoFragmentAssembler.FLAG_MIDDLE -> {
+                if (assembling && ensureCapacity(len)) {
                     messageBuffer.put(buf, 0, len)
                 } else {
+                    assembling = false
                     messageBuffer.clear()
                 }
                 true
             }
-            VideoFragmentAssembler.Action.AppendAndDecode -> {
-                if (ensureCapacity(len)) {
+            VideoFragmentAssembler.FLAG_LAST -> {
+                if (assembling && ensureCapacity(len)) {
                     messageBuffer.put(buf, 0, len)
                     messageBuffer.flip()
                     val assembledSize = messageBuffer.limit()
-                    com.andrerinas.openheadunit.decoder.video.ClusterVideoServer.getInstance()
-                        .onClusterH264Frame(messageBuffer.array(), 0, assembledSize, isConfig)
+                    if (assembledSize > 0) {
+                        com.andrerinas.openheadunit.decoder.video.ClusterVideoServer.getInstance()
+                            .onClusterH264Frame(messageBuffer.array(), 0, assembledSize, assemblingIsConfig)
+                    }
                 }
+                assembling = false
                 messageBuffer.clear()
                 true
             }
-            is VideoFragmentAssembler.Action.Discard -> {
-                action.consumed
-            }
+            else -> false
         }
     }
 
     fun release() {
+        assembling = false
         messageBuffer.clear()
-        assembler.reset()
     }
 }

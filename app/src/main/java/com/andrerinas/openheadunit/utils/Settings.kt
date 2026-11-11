@@ -2872,4 +2872,8 @@ class Settings(private val context: Context) {
     var clusterResolution: String
         get() = prefs.getString("cluster_resolution", "800x480") ?: "800x480"
         set(value) = prefs.edit().putString("cluster_resolution", value).apply()
+
+    var clusterPort: Int
+        get() = prefs.getInt("cluster_port", 5289).let { if (it <= 1024 || it > 65535 || it == 5288) 5289 else it }
+        set(value) = prefs.edit().putInt("cluster_port", if (value <= 1024 || value > 65535 || value == 5288) 5289 else value).apply()
 }

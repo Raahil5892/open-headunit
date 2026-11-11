@@ -1921,11 +1921,14 @@
     <string name="audio_matching_option" translatable="false">%1$s\n(%2$s)</string>
     <string name="audio_matching_description">OHU remains the default. WSOLA aligns overlapping waveforms; Phase Vocoder adjusts spectral phases. Short uses a shorter analysis window. Phase Gradient integrates phase gradients to reconstruct phases. These independent methods add processing latency; their names do not rank sound quality.\n\nNative methods: PCM music. Navigation, voice responses, system sounds and AAC use OHU.\nReconnect to apply. Removed engine preferences reset to OHU.</string>
 
-    <string name="enable_cluster_display">Enable Instrument Cluster Stream</string>
-    <string name="enable_cluster_display_summary">Negotiate secondary DISPLAY_TYPE_CLUSTER video channel and broadcast H.264 Annex-B over TCP port 5288 / Secondary Presentation</string>
+    <string name="enable_cluster_display">Enable Virtual Cockpit Cluster Stream</string>
+    <string name="enable_cluster_display_summary">Negotiate secondary DISPLAY_TYPE_CLUSTER video channel and broadcast H.264 Annex-B over TCP port 5289 / Secondary Presentation</string>
     <string name="cluster_resolution">Cluster Video Resolution</string>
     <string name="cluster_resolution_summary">Select 800x480 (fastest hardware decode) or 1280x720 (HD gauge cluster)</string>
+    <string name="cluster_tcp_port">Cluster Stream TCP Port</string>
+    <string name="cluster_tcp_port_summary">TCP port for raw H.264 Annex-B cluster stream (Default: 5289; avoids port 5288 Wireless AA listener)</string>
+    <string name="cluster_stream_endpoint">Cluster Stream Endpoint &amp; Receiver</string>
     <string name="open_cluster_receiver_mode">Open Cluster Receiver Mode</string>
-    <string name="open_cluster_receiver_mode_desc">Launch full-screen immersive H.264 Annex-B TCP :5288 Instrument Cluster Receiver</string>
+    <string name="open_cluster_receiver_mode_desc">Launch full-screen immersive H.264 Annex-B TCP :5289 Instrument Cluster Receiver</string>
     <string name="shortcut_cluster_receiver_short">Cluster Mode</string>
 </resources>

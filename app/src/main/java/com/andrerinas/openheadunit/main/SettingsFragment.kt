@@ -162,6 +162,7 @@ class SettingsFragment : Fragment() {
         "gpsNavigation",
         // Graphic
         "resolution", "dpiPixelDensity", "viewMode", "screenOrientation", "startInFullscreenMode",
+        "enableClusterDisplay", "clusterResolution", "clusterPort", "clusterStreamEndpoint",
         // Theming
         "loadingScreen", "customization",
         // Video
@@ -268,6 +269,7 @@ class SettingsFragment : Fragment() {
     private var pendingHudMirroring by pending::hudMirroring
     private var pendingEnableClusterDisplay by pending::enableClusterDisplay
     private var pendingClusterResolution by pending::clusterResolution
+    private var pendingClusterPort by pending::clusterPort
 
     private var pendingKillOnDisconnect by pending::killOnDisconnect
     private var pendingAutoKillOemApps by pending::autoKillOemApps
@@ -694,6 +696,7 @@ class SettingsFragment : Fragment() {
         pendingHudMirroring?.let { if (it != settings.hudMirroring) settings.hudMirroring = it }
         pendingEnableClusterDisplay?.let { if (it != settings.enableClusterDisplay) settings.enableClusterDisplay = it }
         pendingClusterResolution?.let { if (it != settings.clusterResolution) settings.clusterResolution = it }
+        pendingClusterPort?.let { if (it != settings.clusterPort) settings.clusterPort = it }
 
         pendingKillOnDisconnect?.let { if (it != settings.rawKillOnDisconnect) settings.rawKillOnDisconnect = it }
         pendingAutoKillOemApps?.let { if (it != settings.autoKillOemApps) settings.autoKillOemApps = it }
@@ -1657,52 +1660,93 @@ class SettingsFragment : Fragment() {
         ))
 
         items.add(SettingItem.ToggleSettingEntry(
-            stableId = "enable_cluster_display",
+            stableId = "enableClusterDisplay",
             nameResId = R.string.enable_cluster_display,
             descriptionResId = R.string.enable_cluster_display_summary,
             helpResId = R.string.enable_cluster_display_summary,
             isChecked = pendingEnableClusterDisplay ?: settings.enableClusterDisplay,
-            searchKeywords = "cluster instrument gauge secondary display tcp 5288 waze maps",
+            searchKeywords = "cluster instrument gauge secondary display virtual cockpit tcp 5289 waze maps",
             onCheckedChanged = { isChecked ->
                 pendingEnableClusterDisplay = isChecked
                 settings.enableClusterDisplay = isChecked
+                if (isChecked) {
+                    com.andrerinas.openheadunit.decoder.video.ClusterVideoServer.getInstance()
+                        .start(requireContext(), pendingClusterPort ?: settings.clusterPort)
+                } else {
+                    com.andrerinas.openheadunit.decoder.video.ClusterVideoServer.getInstance().stop()
+                }
                 checkChanges()
                 updateSettingsList()
             }
         ))
 
-        items.add(SettingItem.SettingEntry(
-            stableId = "cluster_resolution",
+        val clusterResOptions = listOf("800x480", "1280x720")
+        val currentClusterRes = pendingClusterResolution ?: settings.clusterResolution
+        val clusterResIndex = if (currentClusterRes == "1280x720") 1 else 0
+
+        items.add(SettingItem.SegmentedButtonSettingEntry(
+            stableId = "clusterResolution",
             nameResId = R.string.cluster_resolution,
+            options = clusterResOptions,
+            selectedIndex = clusterResIndex,
             helpResId = R.string.cluster_resolution_summary,
-            value = pendingClusterResolution ?: settings.clusterResolution,
-            searchKeywords = "cluster resolution 800x480 1280x720 480p 720p",
+            searchKeywords = "cluster resolution 800x480 1280x720 480p 720p virtual cockpit",
+            onOptionSelected = { index ->
+                val chosenRes = if (index == 1) "1280x720" else "800x480"
+                pendingClusterResolution = chosenRes
+                settings.clusterResolution = chosenRes
+                checkChanges()
+                updateSettingsList()
+            }
+        ))
+
+        val effectiveClusterPort = pendingClusterPort ?: settings.clusterPort
+        val localHeadUnitIp = com.andrerinas.openheadunit.decoder.video.ClusterVideoServer.resolveLocalIpAddress(requireContext())
+
+        items.add(SettingItem.SettingEntry(
+            stableId = "clusterPort",
+            nameResId = R.string.cluster_tcp_port,
+            helpResId = R.string.cluster_tcp_port_summary,
+            value = "TCP :$effectiveClusterPort",
+            searchKeywords = "cluster tcp port 5289 socket relay",
             onClick = { _ ->
-                val resOptions = arrayOf("800x480", "1280x720")
-                val cur = pendingClusterResolution ?: settings.clusterResolution
-                val curIdx = resOptions.indexOf(cur).coerceAtLeast(0)
+                val input = EditText(requireContext()).apply {
+                    inputType = InputType.TYPE_CLASS_NUMBER
+                    setText((pendingClusterPort ?: settings.clusterPort).toString())
+                    hint = "5289"
+                }
                 MaterialAlertDialogBuilder(requireContext(), R.style.DarkAlertDialog)
-                    .setTitle(R.string.cluster_resolution)
-                    .setSingleChoiceItems(resOptions, curIdx) { dialog, which ->
-                        val chosenRes = resOptions[which]
-                        pendingClusterResolution = chosenRes
-                        settings.clusterResolution = chosenRes
+                    .setTitle(R.string.cluster_tcp_port)
+                    .setMessage(R.string.cluster_tcp_port_summary)
+                    .setView(input)
+                    .setPositiveButton(android.R.string.ok) { _, _ ->
+                        val parsed = input.text?.toString()?.trim()?.toIntOrNull()
+                        val validPort = if (parsed != null && parsed in 1025..65535 && parsed != 5288) parsed else 5289
+                        pendingClusterPort = validPort
+                        settings.clusterPort = validPort
+                        if (pendingEnableClusterDisplay ?: settings.enableClusterDisplay) {
+                            com.andrerinas.openheadunit.decoder.video.ClusterVideoServer.getInstance()
+                                .start(requireContext(), validPort)
+                        }
                         checkChanges()
-                        dialog.dismiss()
                         updateSettingsList()
                     }
+                    .setNegativeButton(android.R.string.cancel, null)
                     .show()
             }
         ))
 
         items.add(SettingItem.SettingEntry(
-            stableId = "open_cluster_receiver_mode",
-            nameResId = R.string.open_cluster_receiver_mode,
+            stableId = "clusterStreamEndpoint",
+            nameResId = R.string.cluster_stream_endpoint,
             helpResId = R.string.open_cluster_receiver_mode_desc,
-            value = "TCP :5288",
-            searchKeywords = "open cluster receiver mode gauge cockpit",
+            value = "$localHeadUnitIp:$effectiveClusterPort • Launch Receiver",
+            searchKeywords = "cluster stream endpoint ip port 5289 open cluster receiver mode gauge cockpit",
             onClick = { _ ->
-                startActivity(Intent(requireContext(), com.andrerinas.openheadunit.clusterreceiver.ClusterReceiverActivity::class.java))
+                val intent = Intent(requireContext(), com.andrerinas.openheadunit.clusterreceiver.ClusterReceiverActivity::class.java).apply {
+                    putExtra(com.andrerinas.openheadunit.clusterreceiver.ClusterReceiverActivity.EXTRA_HEADUNIT_PORT, pendingClusterPort ?: settings.clusterPort)
+                }
+                startActivity(intent)
             }
         ))
 

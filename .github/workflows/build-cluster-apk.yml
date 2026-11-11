@@ -54,7 +54,7 @@ jobs:
 
       - name: Copy APK with descriptive cluster name
         run: |
-          cp app/build/outputs/apk/github/debug/*.apk app/build/outputs/apk/github/debug/open-headunit-virtual-cockpit-v4.0.0-cluster1-debug.apk
+          cp app/build/outputs/apk/github/debug/*.apk app/build/outputs/apk/github/debug/open-headunit-virtual-cockpit-v4.0.0-cluster2-debug.apk
           ls -lh app/build/outputs/apk/github/debug/
 
       - name: Upload APK Artifact
@@ -64,17 +64,23 @@ jobs:
           path: app/build/outputs/apk/**/*.apk
           if-no-files-found: error
 
-      - name: Publish GitHub Release v4.0.0-cluster1
+      - name: Publish GitHub Release v4.0.0-cluster2
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v4.0.0-cluster1
+          tag_name: v4.0.0-cluster2
           target_commitish: ${{ github.sha }}
-          name: "Open Headunit Virtual Cockpit v4.0.0-cluster1 (Dual-Channel Instrument Cluster)"
+          name: "Open Headunit Virtual Cockpit v4.0.0-cluster2 (Port 5289, Auto-Gateway & Settings UI)"
           body: |
-            ### Open Headunit Virtual Cockpit (`v4.0.0-cluster1`)
-            - **Primary Infotainment Stream (`DISPLAY_TYPE_MAIN = 0`)**: Rendered on the center Android head unit display.
-            - **Native OEM Instrument Cluster Stream (`DISPLAY_TYPE_CLUSTER = 1`)**: Negotiated via secondary `AVChannel` (`Channel.ID_CLU = 14` / `AA_CH_CLU = 8`, `display_id = 1`, `display_type = 1`, `available_while_in_call = true`), decoded in parallel, and broadcast as a raw H.264 Annex-B stream over TCP port `5288` (with cached SPS/PPS replay) and/or secondary Android `Presentation` display.
-            - **Companion Receiver Mode**: Includes exported `ClusterReceiverActivity` ("Open Cluster Receiver Mode") accessible directly from the Home screen driver bar, app launcher icon, or long-press app shortcuts.
+            ### Open Headunit Virtual Cockpit (`v4.0.0-cluster2`)
+            - **Port `5289` Migration (`ClusterVideoServer.java` & `ClusterReceiverActivity.kt`)**: Moved Cluster TCP Annex-B relay from port `5288` to **`5289`** (and made `clusterPort` configurable in Settings) so Native Wireless AA (`WirelessServer` on `5288`) and Cluster streaming never collide.
+            - **Smart Gateway Auto-Detection, Floating Overlay & Notch Cutout (`ClusterReceiverActivity.kt`)**:
+              - Auto-detects the Wi-Fi hotspot gateway IP from `ConnectivityManager.getLinkProperties()` / `WifiManager.dhcpInfo.gateway` and persists user-configured IP, TCP port, and Stretch/Fit scaling in `SharedPreferences`.
+              - Displays a floating status overlay (`"Connecting to Cluster at <IP>:5289... Tap screen to change IP"`) that automatically hides as soon as the first decoded H.264 frame renders and opens the configuration dialog on single-tap or long-press.
+              - Sets `LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES` (API 28+) so the cluster view stretches across camera notches on 20:9 phones.
+            - **Basic & Advanced Graphic Settings UI (`SettingsFragment.kt` & `SettingsPendingCopy.kt`)**:
+              - Added `enableClusterDisplay` (`ToggleSettingEntry`), `clusterResolution` (`SegmentedButtonSettingEntry`: `800x480` vs `1280x720`), `clusterPort` (`SettingEntry`), and `clusterStreamEndpoint` (`<IP>:5289 • Launch Receiver`) to both the Graphic section and `basicSettingIds`.
+            - **Hardened Inbound `Channel.ID_CLU` (`14`) Routing (`AapControl.kt`, `AapVideo.kt`, `CommManager.kt`)**:
+              - Verified `ChannelOpenResponse`, `AVChannelSetupResponse`, unsolicited `VideoFocusEvent(VIDEO_FOCUS_PROJECTED)`, per-frame `MediaAck`, and direct `AapClusterVideo` H.264/SPS/PPS assembly into `ClusterVideoServer.getInstance()`.
           files: |
             app/build/outputs/apk/github/debug/*.apk
           draft: false

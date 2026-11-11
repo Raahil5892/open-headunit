@@ -94,6 +94,7 @@ class SettingsPendingCopy {
     var hudMirroring: Boolean? = null
     var enableClusterDisplay: Boolean? = null
     var clusterResolution: String? = null
+    var clusterPort: Int? = null
     var killOnDisconnect: Boolean? = null
     var autoKillOemApps: Boolean? = null
     var raiseProjectionDuringCall: Boolean? = null
@@ -188,6 +189,7 @@ class SettingsPendingCopy {
         hudMirroring = settings.hudMirroring
         enableClusterDisplay = settings.enableClusterDisplay
         clusterResolution = settings.clusterResolution
+        clusterPort = settings.clusterPort
         killOnDisconnect = settings.rawKillOnDisconnect
         autoKillOemApps = settings.autoKillOemApps
         raiseProjectionDuringCall = settings.raiseProjectionDuringCall
@@ -283,6 +285,7 @@ class SettingsPendingCopy {
         hudMirroring != settings.hudMirroring ||
         enableClusterDisplay != settings.enableClusterDisplay ||
         clusterResolution != settings.clusterResolution ||
+        clusterPort != settings.clusterPort ||
         killOnDisconnect != settings.rawKillOnDisconnect ||
         autoKillOemApps != settings.autoKillOemApps ||
         raiseProjectionDuringCall != settings.raiseProjectionDuringCall ||

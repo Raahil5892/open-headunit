@@ -526,6 +526,7 @@ internal class AapControlGateway(
     }
 
     private fun channelOpenRequest(request: Control.ChannelOpenRequest, channel: Int): Int {
+        AppLog.i("ChannelOpenRequest on channel %s (id=%d, serviceId=%d) -> STATUS_SUCCESS", Channel.name(channel), channel, request.serviceId)
         val msg = AapMessage(channel, Control.ControlMsgType.MESSAGE_CHANNEL_OPEN_RESPONSE_VALUE, Control.ChannelOpenResponse.newBuilder()
                 .setStatus(Common.MessageStatus.STATUS_SUCCESS)
                 .build())
