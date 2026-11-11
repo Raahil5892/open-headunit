@@ -1690,7 +1690,6 @@ class SettingsFragment : Fragment() {
             options = clusterResOptions,
             selectedIndex = clusterResIndex,
             helpResId = R.string.cluster_resolution_summary,
-            searchKeywords = "cluster resolution 800x480 1280x720 480p 720p virtual cockpit",
             onOptionSelected = { index ->
                 val chosenRes = if (index == 1) "1280x720" else "800x480"
                 pendingClusterResolution = chosenRes
