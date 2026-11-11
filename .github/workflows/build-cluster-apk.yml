@@ -32,6 +32,8 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'cmdline-tools;latest platform-tools'
 
       - name: Install Android SDK Platform 36, NDK 29 & CMake 3.22.1
         run: |
