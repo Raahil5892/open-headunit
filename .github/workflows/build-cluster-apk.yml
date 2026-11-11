@@ -72,6 +72,7 @@ jobs:
           name: "Open Headunit Virtual Cockpit v4.0.0-cluster2 (Port 5289, Auto-Gateway & Settings UI)"
           body: |
             ### Open Headunit Virtual Cockpit (`v4.0.0-cluster2`)
+            - **Fixed Black Screen on App Launch (`AndroidManifest.xml` & `ClusterReceiverActivity.kt`)**: Kept `.main.MainActivity` as the sole primary `MAIN`/`LAUNCHER` activity so tapping **Open** launches `HomeFragment` instead of an unconnected `ClusterReceiverActivity` `SurfaceView`, and added a one-tap **"Exit to Head Unit Home"** button inside the cluster receiver dialog.
             - **Port `5289` Migration (`ClusterVideoServer.java` & `ClusterReceiverActivity.kt`)**: Moved Cluster TCP Annex-B relay from port `5288` to **`5289`** (and made `clusterPort` configurable in Settings) so Native Wireless AA (`WirelessServer` on `5288`) and Cluster streaming never collide.
             - **Smart Gateway Auto-Detection, Floating Overlay & Notch Cutout (`ClusterReceiverActivity.kt`)**:
               - Auto-detects the Wi-Fi hotspot gateway IP from `ConnectivityManager.getLinkProperties()` / `WifiManager.dhcpInfo.gateway` and persists user-configured IP, TCP port, and Stretch/Fit scaling in `SharedPreferences`.
