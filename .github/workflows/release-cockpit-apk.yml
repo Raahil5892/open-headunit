@@ -1,0 +1,78 @@
+name: Release Virtual Cockpit APK
+
+on:
+  push:
+    branches:
+      - feat/dual-cluster-cockpit
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  assemble-and-release:
+    name: Assemble Dual-Cluster Cockpit APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'cmdline-tools;latest platform-tools'
+
+      - name: Install Android SDK Platform 36, NDK 29 & CMake 3.22.1
+        run: |
+          for attempt in 1 2 3; do
+            yes | sdkmanager --licenses >/dev/null 2>&1 || true
+            sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;29.0.14206865" "cmake;3.22.1" && exit 0
+            echo "sdkmanager attempt $attempt failed; retrying in 15s..." >&2
+            sleep 15
+          done
+          echo "sdkmanager failed after 3 attempts" >&2
+          exit 1
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Build Debug APK (assembleGithubDebug)
+        run: ./gradlew assembleGithubDebug --no-daemon --stacktrace
+
+      - name: Copy APK with descriptive cluster name
+        run: |
+          cp app/build/outputs/apk/github/debug/*.apk app/build/outputs/apk/github/debug/open-headunit-virtual-cockpit-v4.0.0-cluster2-debug.apk
+          ls -lh app/build/outputs/apk/github/debug/
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: open-headunit-virtual-cockpit-apk
+          path: app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+
+      - name: Publish GitHub Release v4.0.0-cluster2
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v4.0.0-cluster2
+          target_commitish: ${{ github.sha }}
+          name: "Open Headunit Virtual Cockpit v4.0.0-cluster2 (MainActivity Fix, Port 5289 & Auto-Gateway)"
+          body: |
+            ### Open Headunit Virtual Cockpit (v4.0.0-cluster2)
+            - Fixed Black Screen on App Launch (AndroidManifest.xml & ClusterReceiverActivity.kt): Kept .main.MainActivity as the sole primary MAIN/LAUNCHER activity so opening the app launches HomeFragment instead of an unconnected ClusterReceiverActivity SurfaceView, and added an Exit to Head Unit Home button inside the cluster receiver dialog.
+            - Port 5289 Migration (ClusterVideoServer.java & ClusterReceiverActivity.kt): Moved Cluster TCP Annex-B relay from port 5288 to 5289 (and made clusterPort configurable in Settings) so Native Wireless AA (WirelessServer on 5288) and Cluster streaming never collide.
+            - Smart Gateway Auto-Detection, Floating Overlay & Notch Cutout (ClusterReceiverActivity.kt): Auto-detects the Wi-Fi hotspot gateway IP from ConnectivityManager.getLinkProperties() / WifiManager.dhcpInfo.gateway, persists user overrides in SharedPreferences, shows an auto-hiding status overlay, and sets LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES.
+            - Basic & Advanced Graphic Settings UI (SettingsFragment.kt & SettingsPendingCopy.kt): Added enableClusterDisplay, clusterResolution (800x480 vs 1280x720), clusterPort, and clusterStreamEndpoint to both the Graphic section and basicSettingIds.
+          files: |
+            app/build/outputs/apk/github/debug/*.apk
+          draft: false
+          prerelease: false
