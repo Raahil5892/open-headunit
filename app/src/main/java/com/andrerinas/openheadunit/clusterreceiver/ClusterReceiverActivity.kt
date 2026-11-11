@@ -3,6 +3,7 @@ package com.andrerinas.openheadunit.clusterreceiver
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -400,11 +401,9 @@ class ClusterReceiverActivity : Activity(), SurfaceHolder.Callback {
                 restartActiveConnection()
                 enableImmersiveFullscreen()
             }
-            .setNegativeButton("Cancel") { _, _ ->
-                if (firstFrameRendered.get()) {
-                    statusOverlay.visibility = View.GONE
-                }
-                enableImmersiveFullscreen()
+            .setNegativeButton("Exit to Head Unit Home") { _, _ ->
+                startActivity(Intent(this, com.andrerinas.openheadunit.main.MainActivity::class.java))
+                finish()
             }
             .setOnDismissListener {
                 enableImmersiveFullscreen()
