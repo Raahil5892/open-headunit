@@ -10,10 +10,6 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: cluster-apk-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   build-cluster-apk:
     name: Assemble Dual-Cluster Cockpit APK
