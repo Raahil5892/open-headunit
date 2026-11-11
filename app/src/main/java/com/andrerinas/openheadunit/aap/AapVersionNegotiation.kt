@@ -14,7 +14,7 @@ object AapVersionNegotiation {
 
     /** What Messages.versionRequest announces. */
     const val ANNOUNCED_MAJOR = 1
-    const val ANNOUNCED_MINOR = 2
+    const val ANNOUNCED_MINOR = 7
 
     /** Messages added in 1.6 must not be sent to a phone that selected less. */
     const val FEATURE_MINOR_1_6 = 6

@@ -108,6 +108,12 @@ internal class AapMessageHandlerType(
             }
         }
 
+        if (message.channel == Channel.ID_CLU) {
+            if (transport.dispatchClusterVideo(message)) {
+                return
+            }
+        }
+
         // 2. Try processing as Audio stream (Speech, System, Media)
         if (message.isAudio && AudioMediaPayload.isMedia(msgType)) {
             val sessionId = transport.getSessionId(message.channel)

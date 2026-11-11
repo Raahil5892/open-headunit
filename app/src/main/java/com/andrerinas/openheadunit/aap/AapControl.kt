@@ -52,6 +52,10 @@ internal class AapControlMedia(
                 val focusRequest = message.parse(Media.VideoFocusRequestNotification.newBuilder()).build()
                 AppLog.i("RX: Video Focus Request - mode: %s, reason: %s", focusRequest.mode, focusRequest.reason)
 
+                if (message.channel == Channel.ID_CLU) {
+                    aapTransport.send(com.andrerinas.openheadunit.aap.protocol.messages.VideoFocusEvent(gain = true, unsolicited = false, channel = Channel.ID_CLU))
+                    return 0
+                }
                 if (focusRequest.mode == Media.VideoFocusMode.VIDEO_FOCUS_NATIVE) {
                     AppLog.i("Video Focus NATIVE received. User clicked Exit in Android Auto.")
                     val ctx = aapTransport.context
@@ -104,6 +108,10 @@ internal class AapControlMedia(
         }
 
         aapTransport.setSessionId(channel, request.sessionId)
+        if (channel == Channel.ID_CLU) {
+            aapTransport.send(com.andrerinas.openheadunit.aap.protocol.messages.VideoFocusEvent(gain = true, unsolicited = true, channel = Channel.ID_CLU))
+            return 0
+        }
         aapTransport.noteAudioSinkStarted(channel)
         aapAudio.preparePlayback(channel)
         return 0
@@ -125,6 +133,10 @@ internal class AapControlMedia(
         val msg = AapMessage(channel, Media.MsgType.MEDIA_MESSAGE_CONFIG_VALUE, configResponse)
         if (channel == Channel.ID_VID) {
             if (aapTransport.sendVideoSetupResponse(msg)) aapTransport.gainVideoFocus()
+        } else if (channel == Channel.ID_CLU) {
+            aapTransport.send(msg)
+            // Immediately send unsolicited VideoFocusNotification(VIDEO_FOCUS_PROJECTED, true) on Cluster channel
+            aapTransport.send(com.andrerinas.openheadunit.aap.protocol.messages.VideoFocusEvent(gain = true, unsolicited = true, channel = Channel.ID_CLU))
         } else {
             aapTransport.send(msg)
         }
@@ -144,6 +156,9 @@ internal class AapControlMedia(
     }
 
     private fun maxUnackedFor(channel: Int): Int {
+        if (channel == Channel.ID_CLU) {
+            return 1
+        }
         if (channel == Channel.ID_VID) {
             // ServiceDiscovery's announcement, not the stored preference, chooses the decoder.
             val codec = aapTransport.aapVideo.announcedCodec
@@ -505,7 +520,7 @@ internal class AapControlGateway(
             Channel.ID_CTR -> return serviceControl.execute(message)
             Channel.ID_INP -> return touchControl.execute(message)
             Channel.ID_SEN -> return sensorControl.execute(message)
-            Channel.ID_VID, Channel.ID_AUD, Channel.ID_AU1, Channel.ID_AU2, Channel.ID_MIC -> return mediaControl.execute(message)
+            Channel.ID_VID, Channel.ID_CLU, Channel.ID_AUD, Channel.ID_AU1, Channel.ID_AU2, Channel.ID_MIC -> return mediaControl.execute(message)
         }
         return 0
     }

@@ -103,6 +103,7 @@ class AapTransport(
 
     internal val aapAudio: AapAudio
     internal val aapVideo: AapVideo
+    internal val aapClusterVideo = AapClusterVideo()
     private var sendThread: HandlerThread? = null
     private var pollThread: HandlerThread? = null
     private var videoThread: HandlerThread? = null
@@ -864,7 +865,7 @@ class AapTransport(
                 if (videoDecoder.onFrameDropped === keyframeRecoveryCallback) videoDecoder.onFrameDropped = null
                 if (videoDecoder.onKeyframeObserved === keyframeObservedCallback) videoDecoder.onKeyframeObserved = null
             }
-            cleanupStep("video") { aapVideo.release() }
+            cleanupStep("video") { aapVideo.release(); aapClusterVideo.release() }
             videoBufferPool.clear()
             videoBacklog.set(0)
             videoShedTotal.set(0)
@@ -929,6 +930,33 @@ class AapTransport(
      * the window we announce, though: with the feed held, a phone told `max_unacked=12` ran the
      * backlog to 256, so [VIDEO_BACKLOG_LIMIT] is the real ceiling.
      */
+    internal fun dispatchClusterVideo(message: AapMessage): Boolean {
+        val isPayload = aapClusterVideo.isPayload(message)
+        val acks = AapMessageFraming.completesMediaData(message.type, message.flags.toInt())
+        val ackSession = getSessionId(message.channel)
+        val handler = videoHandler
+        if (handler == null) {
+            if (acks) sendMediaAck(message.channel, ackSession)
+            return isPayload
+        }
+        val channel = message.channel
+        val size = message.size
+        val copy = obtainVideoBuffer(size)
+        System.arraycopy(message.data, 0, copy, 0, size)
+        val queued = AapMessage(channel, message.flags, message.type, message.dataOffset, size, copy)
+        handler.post {
+            try {
+                aapClusterVideo.process(queued)
+            } catch (e: Exception) {
+                AppLog.e("Error processing cluster video message", e)
+            } finally {
+                recycleVideoBuffer(copy)
+                if (acks) sendMediaAck(channel, ackSession)
+            }
+        }
+        return isPayload
+    }
+
     internal fun dispatchVideo(message: AapMessage): Boolean {
         val isPayload = aapVideo.isPayload(message)
         val acks = AapMessageFraming.completesMediaData(message.type, message.flags.toInt())

@@ -88,4 +88,15 @@
             <extra android:name="state" android:value="auto" />
         </intent>
     </shortcut>
+    <shortcut
+        android:shortcutId="cluster_receiver_mode"
+        android:enabled="true"
+        android:icon="@drawable/ic_stat_aa"
+        android:shortcutShortLabel="@string/shortcut_cluster_receiver_short"
+        android:shortcutLongLabel="@string/open_cluster_receiver_mode">
+        <intent
+            android:action="com.andrerinas.openheadunit.ACTION_CLUSTER_RECEIVER"
+            android:targetPackage="com.andrerinas.headunitrevived"
+            android:targetClass="com.andrerinas.openheadunit.clusterreceiver.ClusterReceiverActivity" />
+    </shortcut>
 </shortcuts>

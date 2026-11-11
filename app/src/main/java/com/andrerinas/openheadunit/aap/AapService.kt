@@ -1230,6 +1230,7 @@ class AapService : Service() {
         StationStandDown.restore(this)
         setupCarMode()
         setupNightMode()
+        com.andrerinas.openheadunit.decoder.video.ClusterVideoServer.getInstance().start(this)
         commManager.onSessionFailure = { reason ->
             emitSessionState(SessionStateIntent.STATE_FAILED, reason)
             projectingSinceMs = 0L
@@ -3482,6 +3483,7 @@ class AapService : Service() {
         closeRetainedHct()
         AppLog.i("AapService destroying... (wakeLock held=${bootWakeLock?.isHeld == true})")
         FloatingButtonManager.removeOverlay(this)
+        com.andrerinas.openheadunit.decoder.video.ClusterVideoServer.getInstance().stop()
         stopForegroundForShutdown()
         deviceHackManager?.stop()
         deviceHackManager = null

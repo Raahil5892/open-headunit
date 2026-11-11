@@ -120,6 +120,7 @@ class HomeFragment : Fragment() {
     private lateinit var selfModeTile: View
     private lateinit var usbTile: View
     private lateinit var settingsTile: View
+    private var clusterReceiverTile: View? = null
     private lateinit var wifiTile: View
     private lateinit var exitButton: View
     private lateinit var appsButton: View
@@ -221,6 +222,7 @@ class HomeFragment : Fragment() {
         selfModeTile = container.findViewById(R.id.self_mode_button)
         usbTile = container.findViewById(R.id.usb_button)
         settingsTile = container.findViewById(R.id.settings_button)
+        clusterReceiverTile = container.findViewById(R.id.cluster_receiver_button)
         wifiTile = container.findViewById(R.id.wifi_button)
         exitButton = container.findViewById(R.id.exit_button)
         appsButton = container.findViewById(R.id.apps_button)
@@ -1782,6 +1784,9 @@ class HomeFragment : Fragment() {
         }
         settingsTile.setOnClickListener {
             startActivity(Intent(requireContext(), SettingsActivity::class.java))
+        }
+        clusterReceiverTile?.setOnClickListener {
+            startActivity(Intent(requireContext(), com.andrerinas.openheadunit.clusterreceiver.ClusterReceiverActivity::class.java))
         }
         primaryAction?.setOnClickListener { onPrimaryActionClicked() }
         primaryCancel?.setOnClickListener { onPrimaryCancelClicked() }

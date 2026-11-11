@@ -90,6 +90,17 @@
                         android:text="@string/settings" />
                 </LinearLayout>
 
+                <LinearLayout
+                    android:id="@+id/cluster_receiver_button"
+                    style="@style/HomeTile">
+                    <ImageView
+                        style="@style/HomeTileIcon"
+                        app:srcCompat="@drawable/ic_launch_white" />
+                    <com.andrerinas.openheadunit.view.WordFitTextView
+                        style="@style/HomeTileLabel.Wrap"
+                        android:text="@string/open_cluster_receiver_mode" />
+                </LinearLayout>
+
                 <View
                     android:layout_width="0dp"
                     android:layout_height="0dp"

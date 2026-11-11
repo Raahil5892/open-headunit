@@ -391,3 +391,112 @@ internal class AapVideo(private val videoDecoder: VideoDecoder, private val sett
         lastAnomalyReportMs = 0L
     }
 }
+
+
+internal class AapClusterVideo {
+    companion object {
+        private const val INITIAL_BUFFER_BYTES = Messages.DEF_BUFFER_LENGTH * 8
+        private const val MAX_BUFFER_BYTES = Messages.DEF_BUFFER_LENGTH * 32
+    }
+
+    private var messageBuffer = ByteBuffer.allocate(INITIAL_BUFFER_BYTES)
+    private val assembler = VideoFragmentAssembler()
+
+    private fun findStartCode(buf: ByteArray, offset: Int, len: Int): Int {
+        if (offset + 3 > len) return -1
+        if (buf[offset].toInt() == 0 && buf[offset + 1].toInt() == 0) {
+            if (buf[offset + 2].toInt() == 1) return 3
+            if (offset + 4 <= len && buf[offset + 2].toInt() == 0 && buf[offset + 3].toInt() == 1) return 4
+        }
+        return -1
+    }
+
+    private fun payloadStartsAt(buf: ByteArray, offset: Int, len: Int): Boolean {
+        val sc = findStartCode(buf, offset, len)
+        return sc > 0 && len > offset + sc
+    }
+
+    fun isPayload(message: AapMessage): Boolean {
+        val buf = message.data
+        val len = message.size
+        return VideoFragmentAssembler.isPayload(
+            flags = message.flags.toInt(),
+            type = message.type,
+            payloadStartsAt10 = payloadStartsAt(buf, VideoFragmentAssembler.OFFSET_TIMESTAMP_INDICATION, len),
+            payloadStartsAt2 = payloadStartsAt(buf, VideoFragmentAssembler.OFFSET_MEDIA_INDICATION, len)
+        )
+    }
+
+    private fun ensureCapacity(additionalBytes: Int): Boolean {
+        if (messageBuffer.remaining() >= additionalBytes) return true
+        val needed = messageBuffer.position() + additionalBytes
+        if (needed > MAX_BUFFER_BYTES) return false
+        var capacity = messageBuffer.capacity()
+        while (capacity < needed) capacity *= 2
+        val grown = ByteBuffer.allocate(capacity.coerceAtMost(MAX_BUFFER_BYTES))
+        grown.put(messageBuffer.array(), 0, messageBuffer.position())
+        messageBuffer = grown
+        return true
+    }
+
+    fun process(message: AapMessage): Boolean {
+        val buf = message.data
+        val len = message.size
+        val flags = message.flags.toInt()
+        val isConfig = message.type == 1
+
+        val decision = assembler.onMessage(
+            flags = flags,
+            type = message.type,
+            payloadStartsAt10 = payloadStartsAt(buf, VideoFragmentAssembler.OFFSET_TIMESTAMP_INDICATION, len),
+            payloadStartsAt2 = payloadStartsAt(buf, VideoFragmentAssembler.OFFSET_MEDIA_INDICATION, len)
+        )
+
+        return when (val action = decision.action) {
+            is VideoFragmentAssembler.Action.DecodeWhole -> {
+                messageBuffer.clear()
+                val nalLen = len - action.payloadOffset
+                com.andrerinas.openheadunit.decoder.video.ClusterVideoServer.getInstance()
+                    .onClusterH264Frame(buf, action.payloadOffset, nalLen, isConfig)
+                true
+            }
+            is VideoFragmentAssembler.Action.BeginAssembly -> {
+                messageBuffer.clear()
+                val bytes = len - action.payloadOffset
+                if (ensureCapacity(bytes)) {
+                    messageBuffer.put(buf, action.payloadOffset, bytes)
+                } else {
+                    messageBuffer.clear()
+                }
+                true
+            }
+            VideoFragmentAssembler.Action.Append -> {
+                if (ensureCapacity(len)) {
+                    messageBuffer.put(buf, 0, len)
+                } else {
+                    messageBuffer.clear()
+                }
+                true
+            }
+            VideoFragmentAssembler.Action.AppendAndDecode -> {
+                if (ensureCapacity(len)) {
+                    messageBuffer.put(buf, 0, len)
+                    messageBuffer.flip()
+                    val assembledSize = messageBuffer.limit()
+                    com.andrerinas.openheadunit.decoder.video.ClusterVideoServer.getInstance()
+                        .onClusterH264Frame(messageBuffer.array(), 0, assembledSize, isConfig)
+                }
+                messageBuffer.clear()
+                true
+            }
+            is VideoFragmentAssembler.Action.Discard -> {
+                action.consumed
+            }
+        }
+    }
+
+    fun release() {
+        messageBuffer.clear()
+        assembler.reset()
+    }
+}

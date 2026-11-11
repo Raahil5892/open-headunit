@@ -92,6 +92,8 @@ class SettingsPendingCopy {
     var videoFitMode: Settings.VideoFitMode? = null
     var forcedScale: Boolean? = null
     var hudMirroring: Boolean? = null
+    var enableClusterDisplay: Boolean? = null
+    var clusterResolution: String? = null
     var killOnDisconnect: Boolean? = null
     var autoKillOemApps: Boolean? = null
     var raiseProjectionDuringCall: Boolean? = null
@@ -184,6 +186,8 @@ class SettingsPendingCopy {
         videoFitMode = settings.videoFitMode
         forcedScale = settings.forcedScale
         hudMirroring = settings.hudMirroring
+        enableClusterDisplay = settings.enableClusterDisplay
+        clusterResolution = settings.clusterResolution
         killOnDisconnect = settings.rawKillOnDisconnect
         autoKillOemApps = settings.autoKillOemApps
         raiseProjectionDuringCall = settings.raiseProjectionDuringCall
@@ -277,6 +281,8 @@ class SettingsPendingCopy {
         videoFitMode != settings.videoFitMode ||
         forcedScale != settings.forcedScale ||
         hudMirroring != settings.hudMirroring ||
+        enableClusterDisplay != settings.enableClusterDisplay ||
+        clusterResolution != settings.clusterResolution ||
         killOnDisconnect != settings.rawKillOnDisconnect ||
         autoKillOemApps != settings.autoKillOemApps ||
         raiseProjectionDuringCall != settings.raiseProjectionDuringCall ||

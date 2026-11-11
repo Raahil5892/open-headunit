@@ -15,7 +15,7 @@ object Messages {
     fun createRawMessage(chan: Int, flags: Int, type: Int, data: ByteArray): ByteArray =
             createRawMessage(chan, flags, type, data, data.size)
 
-    private var VERSION_REQUEST = byteArrayOf(0, 1, 0, 2)
+    private var VERSION_REQUEST = byteArrayOf(0, 1, 0, 7)
 
     private fun createRawMessage(chan: Int, flags: Int, type: Int, data: ByteArray, size: Int): ByteArray {
 

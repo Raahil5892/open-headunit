@@ -266,6 +266,8 @@ class SettingsFragment : Fragment() {
     private var pendingVideoFitMode by pending::videoFitMode
     private var pendingForcedScale by pending::forcedScale
     private var pendingHudMirroring by pending::hudMirroring
+    private var pendingEnableClusterDisplay by pending::enableClusterDisplay
+    private var pendingClusterResolution by pending::clusterResolution
 
     private var pendingKillOnDisconnect by pending::killOnDisconnect
     private var pendingAutoKillOemApps by pending::autoKillOemApps
@@ -690,6 +692,8 @@ class SettingsFragment : Fragment() {
         pendingVideoFitMode?.let { if (it != settings.videoFitMode) settings.videoFitMode = it }
         pendingForcedScale?.let { if (it != settings.forcedScale) settings.forcedScale = it }
         pendingHudMirroring?.let { if (it != settings.hudMirroring) settings.hudMirroring = it }
+        pendingEnableClusterDisplay?.let { if (it != settings.enableClusterDisplay) settings.enableClusterDisplay = it }
+        pendingClusterResolution?.let { if (it != settings.clusterResolution) settings.clusterResolution = it }
 
         pendingKillOnDisconnect?.let { if (it != settings.rawKillOnDisconnect) settings.rawKillOnDisconnect = it }
         pendingAutoKillOemApps?.let { if (it != settings.autoKillOemApps) settings.autoKillOemApps = it }
@@ -1649,6 +1653,56 @@ class SettingsFragment : Fragment() {
                 pendingHudMirroring = isChecked
                 checkChanges()
                 updateSettingsList()
+            }
+        ))
+
+        items.add(SettingItem.ToggleSettingEntry(
+            stableId = "enable_cluster_display",
+            nameResId = R.string.enable_cluster_display,
+            descriptionResId = R.string.enable_cluster_display_summary,
+            helpResId = R.string.enable_cluster_display_summary,
+            isChecked = pendingEnableClusterDisplay ?: settings.enableClusterDisplay,
+            searchKeywords = "cluster instrument gauge secondary display tcp 5288 waze maps",
+            onCheckedChanged = { isChecked ->
+                pendingEnableClusterDisplay = isChecked
+                settings.enableClusterDisplay = isChecked
+                checkChanges()
+                updateSettingsList()
+            }
+        ))
+
+        items.add(SettingItem.SettingEntry(
+            stableId = "cluster_resolution",
+            nameResId = R.string.cluster_resolution,
+            helpResId = R.string.cluster_resolution_summary,
+            value = pendingClusterResolution ?: settings.clusterResolution,
+            searchKeywords = "cluster resolution 800x480 1280x720 480p 720p",
+            onClick = { _ ->
+                val resOptions = arrayOf("800x480", "1280x720")
+                val cur = pendingClusterResolution ?: settings.clusterResolution
+                val curIdx = resOptions.indexOf(cur).coerceAtLeast(0)
+                MaterialAlertDialogBuilder(requireContext(), R.style.DarkAlertDialog)
+                    .setTitle(R.string.cluster_resolution)
+                    .setSingleChoiceItems(resOptions, curIdx) { dialog, which ->
+                        val chosenRes = resOptions[which]
+                        pendingClusterResolution = chosenRes
+                        settings.clusterResolution = chosenRes
+                        checkChanges()
+                        dialog.dismiss()
+                        updateSettingsList()
+                    }
+                    .show()
+            }
+        ))
+
+        items.add(SettingItem.SettingEntry(
+            stableId = "open_cluster_receiver_mode",
+            nameResId = R.string.open_cluster_receiver_mode,
+            helpResId = R.string.open_cluster_receiver_mode_desc,
+            value = "TCP :5288",
+            searchKeywords = "open cluster receiver mode gauge cockpit",
+            onClick = { _ ->
+                startActivity(Intent(requireContext(), com.andrerinas.openheadunit.clusterreceiver.ClusterReceiverActivity::class.java))
             }
         ))
 

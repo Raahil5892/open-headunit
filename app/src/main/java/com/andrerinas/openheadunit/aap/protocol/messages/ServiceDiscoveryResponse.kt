@@ -139,6 +139,12 @@ internal class ServiceDiscoveryResponse(context: Context, audioConfig: AudioSess
                             setVideoCodecType(effectiveCodec)
                         }.build())
                     }
+                    mediaSinkServiceBuilder.setUnknownFields(
+                        com.google.protobuf.UnknownFieldSet.newBuilder()
+                            .addField(6, com.google.protobuf.UnknownFieldSet.Field.newBuilder().addVarint(0L).build())
+                            .addField(7, com.google.protobuf.UnknownFieldSet.Field.newBuilder().addVarint(Channel.DISPLAY_TYPE_MAIN.toLong()).build())
+                            .build()
+                    )
                 }.build()
             }.build()
 
@@ -150,6 +156,42 @@ internal class ServiceDiscoveryResponse(context: Context, audioConfig: AudioSess
             })
 
             services.add(video)
+
+            if (settings.enableClusterDisplay) {
+                val clusterRes = if (settings.clusterResolution == "1280x720") {
+                    Control.Service.MediaSinkService.VideoConfiguration.VideoCodecResolutionType._1280x720
+                } else {
+                    Control.Service.MediaSinkService.VideoConfiguration.VideoCodecResolutionType._800x480
+                }
+                val clusterVideo = Control.Service.newBuilder().also { service ->
+                    service.id = Channel.ID_CLU
+                    service.mediaSinkService = Control.Service.MediaSinkService.newBuilder().also { clusterSink ->
+                        clusterSink.availableType = Media.MediaCodecType.MEDIA_CODEC_VIDEO_H264_BP
+                        clusterSink.audioType = Media.AudioStreamType.NONE
+                        clusterSink.availableWhileInCall = true
+                        clusterSink.addVideoConfigs(
+                            Control.Service.MediaSinkService.VideoConfiguration.newBuilder().apply {
+                                codecResolution = clusterRes
+                                frameRate = Control.Service.MediaSinkService.VideoConfiguration.VideoFrameRateType._30
+                                setDensity(160)
+                                setPixelAspectRatioE4(10000)
+                                setMarginWidth(0)
+                                setMarginHeight(0)
+                                setVideoCodecType(Media.MediaCodecType.MEDIA_CODEC_VIDEO_H264_BP)
+                            }.build()
+                        )
+                        // Inject AVChannel field 6 (display_id = 1) and field 7 (display_type = DISPLAY_TYPE_CLUSTER = 1)
+                        clusterSink.setUnknownFields(
+                            com.google.protobuf.UnknownFieldSet.newBuilder()
+                                .addField(6, com.google.protobuf.UnknownFieldSet.Field.newBuilder().addVarint(1L).build())
+                                .addField(7, com.google.protobuf.UnknownFieldSet.Field.newBuilder().addVarint(Channel.DISPLAY_TYPE_CLUSTER.toLong()).build())
+                                .build()
+                        )
+                    }.build()
+                }.build()
+                services.add(clusterVideo)
+                AppLog.i("[ServiceDiscovery] Announced Cluster AVChannel (id=${Channel.ID_CLU}, display_type=${Channel.DISPLAY_TYPE_CLUSTER}, res=${settings.clusterResolution})")
+            }
 
             val input = Control.Service.newBuilder().also { service ->
                 service.id = Channel.ID_INP

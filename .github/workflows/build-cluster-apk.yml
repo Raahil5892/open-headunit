@@ -1,0 +1,79 @@
+name: Build Cluster APK & Release
+
+on:
+  push:
+    branches:
+      - feat/dual-cluster-cockpit
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cluster-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-cluster-apk:
+    name: Assemble Dual-Cluster Cockpit APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK Platform 36, NDK 29 & CMake 3.22.1
+        run: |
+          for attempt in 1 2 3; do
+            yes | sdkmanager --licenses >/dev/null 2>&1 || true
+            sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;29.0.14206865" "cmake;3.22.1" && exit 0
+            echo "sdkmanager attempt $attempt failed; retrying in 15s..." >&2
+            sleep 15
+          done
+          echo "sdkmanager failed after 3 attempts" >&2
+          exit 1
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Build Debug APK (assembleGithubDebug)
+        run: ./gradlew assembleGithubDebug --no-daemon --stacktrace
+
+      - name: Copy APK with descriptive cluster name
+        run: |
+          cp app/build/outputs/apk/github/debug/*.apk app/build/outputs/apk/github/debug/open-headunit-virtual-cockpit-v4.0.0-cluster1-debug.apk
+          ls -lh app/build/outputs/apk/github/debug/
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: open-headunit-virtual-cockpit-apk
+          path: app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+
+      - name: Publish GitHub Release v4.0.0-cluster1
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v4.0.0-cluster1
+          target_commitish: ${{ github.sha }}
+          name: "Open Headunit Virtual Cockpit v4.0.0-cluster1 (Dual-Channel Instrument Cluster)"
+          body: |
+            ### Open Headunit Virtual Cockpit (`v4.0.0-cluster1`)
+            - **Primary Infotainment Stream (`DISPLAY_TYPE_MAIN = 0`)**: Rendered on the center Android head unit display.
+            - **Native OEM Instrument Cluster Stream (`DISPLAY_TYPE_CLUSTER = 1`)**: Negotiated via secondary `AVChannel` (`Channel.ID_CLU = 14` / `AA_CH_CLU = 8`, `display_id = 1`, `display_type = 1`, `available_while_in_call = true`), decoded in parallel, and broadcast as a raw H.264 Annex-B stream over TCP port `5288` (with cached SPS/PPS replay) and/or secondary Android `Presentation` display.
+            - **Companion Receiver Mode**: Includes exported `ClusterReceiverActivity` ("Open Cluster Receiver Mode") accessible directly from the Home screen driver bar, app launcher icon, or long-press app shortcuts.
+          files: |
+            app/build/outputs/apk/github/debug/*.apk
+          draft: false
+          prerelease: false

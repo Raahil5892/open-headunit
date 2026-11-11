@@ -106,6 +106,19 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/cluster_receiver_button"
+            style="@style/HomeTile"
+            android:layout_width="0dp"
+            android:layout_weight="1">
+            <ImageView
+                style="@style/HomeTileIcon"
+                app:srcCompat="@drawable/ic_launch_white" />
+            <com.andrerinas.openheadunit.view.WordFitTextView
+                style="@style/HomeTileLabel.Wrap"
+                android:text="@string/open_cluster_receiver_mode" />
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/exit_button"
             style="@style/HomeTile"
             android:layout_width="0dp"

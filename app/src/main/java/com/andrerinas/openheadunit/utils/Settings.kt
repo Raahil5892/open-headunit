@@ -2864,4 +2864,12 @@ class Settings(private val context: Context) {
         get() = prefs.getBoolean("external-bt-zj-socket-transport", false)
         set(value) = prefs.edit().putBoolean("external-bt-zj-socket-transport", value).apply()
 
+
+    var enableClusterDisplay: Boolean
+        get() = prefs.getBoolean("enable_cluster_display", true)
+        set(value) = prefs.edit().putBoolean("enable_cluster_display", value).apply()
+
+    var clusterResolution: String
+        get() = prefs.getString("cluster_resolution", "800x480") ?: "800x480"
+        set(value) = prefs.edit().putString("cluster_resolution", value).apply()
 }

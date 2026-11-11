@@ -101,3 +101,12 @@ endif()
 target_link_options(hur_time_stretch PRIVATE -nostdlib++)
 target_link_libraries(hur_time_stretch PRIVATE m)
 # The DSP and radix-2 FFT are independent implementations; no vendor libraries.
+
+
+# =========================================================================
+# Target 4: hur_aap_cluster (Native Dual-Channel AAP Cluster Protocol & JNI)
+# =========================================================================
+add_library(hur_aap_cluster SHARED hu_aap.cpp)
+target_compile_features(hur_aap_cluster PRIVATE cxx_std_17)
+target_compile_options(hur_aap_cluster PRIVATE -Wall -Wextra -Werror)
+target_link_libraries(hur_aap_cluster PRIVATE ${log-lib} ${android-lib})

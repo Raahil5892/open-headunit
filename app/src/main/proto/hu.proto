@@ -1,0 +1,76 @@
+syntax = "proto2";
+
+package aap_protobuf;
+
+option java_package = "com.andrerinas.openheadunit.aap.proto";
+option java_outer_classname = "HuProto";
+option optimize_for = LITE_RUNTIME;
+
+enum DisplayType {
+    DISPLAY_TYPE_MAIN = 0;
+    DISPLAY_TYPE_CLUSTER = 1;
+    DISPLAY_TYPE_AUXILIARY = 2;
+    DISPLAY_TYPE_UNKNOWN = 3;
+}
+
+enum MediaStreamType {
+    MEDIA_STREAM_TYPE_NONE = 0;
+    MEDIA_STREAM_TYPE_AUDIO_TTS = 1;
+    MEDIA_STREAM_TYPE_AUDIO_SYSTEM = 2;
+    MEDIA_STREAM_TYPE_MEDIA_OR_VIDEO = 3;
+}
+
+enum MediaCodecType {
+    MEDIA_CODEC_AUDIO_PCM = 1;
+    MEDIA_CODEC_AUDIO_AAC_LC = 2;
+    MEDIA_CODEC_VIDEO_H264_BP = 3;
+    MEDIA_CODEC_AUDIO_AAC_LC_ADTS = 4;
+    MEDIA_CODEC_VIDEO_VP9 = 5;
+    MEDIA_CODEC_VIDEO_AV1 = 6;
+    MEDIA_CODEC_VIDEO_H265 = 7;
+}
+
+enum VideoResolution {
+    VIDEO_800x480 = 1;
+    VIDEO_1280x720 = 2;
+    VIDEO_1920x1080 = 3;
+    VIDEO_2560x1440 = 4;
+    VIDEO_3840x2160 = 5;
+    VIDEO_720x1280 = 6;
+    VIDEO_1080x1920 = 7;
+    VIDEO_1440x2560 = 8;
+    VIDEO_2160x3840 = 9;
+}
+
+enum VideoFrameRate {
+    VIDEO_FPS_60 = 1;
+    VIDEO_FPS_30 = 2;
+}
+
+message VideoConfig {
+    required VideoResolution codec_resolution = 1;
+    required VideoFrameRate frame_rate = 2;
+    required uint32 width_margin = 3;
+    required uint32 height_margin = 4;
+    required uint32 density = 5;
+    optional uint32 decoder_additional_depth = 6;
+    optional uint32 viewing_distance = 7;
+    optional uint32 pixel_aspect_ratio_e4 = 8;
+    optional uint32 real_density = 9;
+    optional MediaCodecType video_codec_type = 10 [default = MEDIA_CODEC_VIDEO_H264_BP];
+}
+
+message AVChannel {
+    optional MediaCodecType stream_type = 1 [default = MEDIA_CODEC_VIDEO_H264_BP];
+    optional MediaStreamType audio_type = 2;
+    repeated VideoConfig video_configs = 4;
+    optional bool available_while_in_call = 5 [default = true];
+    optional uint32 display_id = 6 [default = 0];
+    optional DisplayType display_type = 7 [default = DISPLAY_TYPE_MAIN];
+    optional uint32 keycode = 8;
+}
+
+message ChannelDescriptor {
+    required uint32 channel_id = 1;
+    optional AVChannel av_channel = 3;
+}
