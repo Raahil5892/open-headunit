@@ -1,26 +1,15 @@
 package com.andrerinas.openheadunit.decoder.video;
 
-import android.app.Presentation;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.hardware.display.DisplayManager;
-import android.media.MediaCodec;
-import android.media.MediaFormat;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
-import android.os.Build;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.preference.PreferenceManager;
 import android.util.Log;
-import android.view.Display;
-import android.view.Surface;
-import android.view.SurfaceHolder;
-import android.view.SurfaceView;
-import android.view.ViewGroup;
-import android.widget.FrameLayout;
 import android.widget.Toast;
+
+import com.andrerinas.openheadunit.utils.ToastUtils;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -39,23 +28,22 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Dual-Pipeline Instrument Cluster Video Relay & Secondary Display Presentation Decoder.
+ * Dual-Pipeline Instrument Cluster Video Relay.
  *
  * Receives real-time H.264 Annex-B NAL units from Android Auto's secondary video channel
- * (Channel.ID_CLU = 14 / AA_CH_CLU = 8, DISPLAY_TYPE_CLUSTER = 1) and simultaneously:
- *   1. Broadcasts cached SPS/PPS configuration + live H.264 IDR/P-frames over a non-blocking
- *      TCP ServerSocket on 0.0.0.0:5289 (configurable via "cluster_port") to a spare Android phone
- *      mounted in the gauge cluster (moved off 5288 to avoid colliding with WirelessServer).
- *   2. Automatically detects if a secondary physical/virtual Display is attached via
- *      DisplayManager.getDisplays() and decodes the stream locally into an Android Presentation
- *      window via a dedicated hardware MediaCodec("video/avc") instance.
+ * (Channel.ID_CLU = 14, display_id = 1) and broadcasts cached SPS/PPS configuration + live
+ * H.264 IDR/P-frames over a non-blocking TCP ServerSocket on 0.0.0.0:5289 (configurable via
+ * "cluster_port" in the "settings" SharedPreferences store) to ClusterReceiverActivity.
+ *
+ * Does not allocate a local MediaCodec or attach to DisplayManager.getDisplays(), ensuring
+ * zero interference with Android Auto's VirtualDisplay or hardware codecs in Self Mode.
  */
 public final class ClusterVideoServer {
 
     private static final String TAG = "ClusterVideoServer";
+    public static final String SETTINGS_PREFS_NAME = "settings";
     public static final int DEFAULT_CLUSTER_TCP_PORT = 5289;
     public static final int CLUSTER_TCP_PORT = DEFAULT_CLUSTER_TCP_PORT;
-    private static final String MIME_AVC = MediaFormat.MIMETYPE_VIDEO_AVC;
 
     public static final String PREF_ENABLE_CLUSTER_DISPLAY = "enable_cluster_display";
     public static final String PREF_CLUSTER_RESOLUTION = "cluster_resolution";
@@ -74,11 +62,6 @@ public final class ClusterVideoServer {
     private ExecutorService senderPool;
 
     private Context appContext;
-    private ClusterPresentation clusterPresentation;
-    private MediaCodec secondaryCodec;
-    private final AtomicBoolean secondaryCodecConfigured = new AtomicBoolean(false);
-    private int clusterWidth = 800;
-    private int clusterHeight = 480;
 
     private ClusterVideoServer() {}
 
@@ -105,12 +88,11 @@ public final class ClusterVideoServer {
     }
 
     /**
-     * Starts the TCP Annex-B relay on 0.0.0.0:<cluster_port> (default 5289), attaches to any secondary
-     * Display via Android Presentation, and displays the local IP:Port in an overlay Toast.
+     * Starts the TCP Annex-B relay on 0.0.0.0:<cluster_port> (default 5289).
      */
     public synchronized void start(Context context) {
         this.appContext = context.getApplicationContext();
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(appContext);
+        SharedPreferences prefs = appContext.getSharedPreferences(SETTINGS_PREFS_NAME, Context.MODE_PRIVATE);
         int configuredPort = prefs.getInt(PREF_CLUSTER_PORT, DEFAULT_CLUSTER_TCP_PORT);
         if (configuredPort <= 1024 || configuredPort > 65535 || configuredPort == 5288) {
             configuredPort = DEFAULT_CLUSTER_TCP_PORT;
@@ -120,7 +102,7 @@ public final class ClusterVideoServer {
 
     public synchronized void start(Context context, int port) {
         this.appContext = context.getApplicationContext();
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(appContext);
+        SharedPreferences prefs = appContext.getSharedPreferences(SETTINGS_PREFS_NAME, Context.MODE_PRIVATE);
         boolean enabled = prefs.getBoolean(PREF_ENABLE_CLUSTER_DISPLAY, true);
         if (!enabled) {
             Log.i(TAG, "Cluster display disabled in preferences (enable_cluster_display=false)");
@@ -137,13 +119,6 @@ public final class ClusterVideoServer {
 
         activeTcpPort = targetPort;
         String res = prefs.getString(PREF_CLUSTER_RESOLUTION, "800x480");
-        if ("1280x720".equals(res)) {
-            clusterWidth = 1280;
-            clusterHeight = 720;
-        } else {
-            clusterWidth = 800;
-            clusterHeight = 480;
-        }
 
         running.set(true);
         senderPool = Executors.newSingleThreadExecutor(r -> {
@@ -158,13 +133,13 @@ public final class ClusterVideoServer {
 
         Handler mainHandler = new Handler(Looper.getMainLooper());
         mainHandler.post(() -> {
-            setupSecondaryDisplayPresentationIfAvailable(appContext);
             String localIp = resolveLocalIpAddress(appContext);
-            Toast.makeText(
+            ToastUtils.showToast(
                     appContext,
                     "OpenHeadunit Cluster Stream Ready -> " + localIp + ":" + targetPort + " (" + res + ")",
-                    Toast.LENGTH_LONG
-            ).show();
+                    Toast.LENGTH_LONG,
+                    false
+            );
         });
     }
 
@@ -190,9 +165,6 @@ public final class ClusterVideoServer {
             senderPool.shutdownNow();
             senderPool = null;
         }
-
-        Handler mainHandler = new Handler(Looper.getMainLooper());
-        mainHandler.post(this::releaseSecondaryPresentation);
     }
 
     private void runAcceptLoop(int listenPort) {
@@ -234,8 +206,7 @@ public final class ClusterVideoServer {
     /**
      * Processes each incoming H.264 frame from CLUSTER_VIDEO_CHANNEL_ID.
      * Ensures Annex-B start codes (`0x00 0x00 0x00 0x01`), caches SPS/PPS NAL units,
-     * broadcasts non-blockingly to all connected TCP port 5289 receivers, and feeds
-     * the secondary Presentation MediaCodec if attached.
+     * and broadcasts non-blockingly to all connected TCP port 5289 receivers.
      */
     public void onClusterH264Frame(byte[] data, int offset, int length, boolean isCodecConfig) {
         if (data == null || length <= 0) return;
@@ -251,8 +222,6 @@ public final class ClusterVideoServer {
             final byte[] frameCopy = annexB;
             senderPool.execute(() -> broadcastToTcpClients(frameCopy));
         }
-
-        decodeToSecondaryDisplay(annexB, isCodecConfig);
     }
 
     private void broadcastToTcpClients(byte[] annexBFrame) {
@@ -335,98 +304,6 @@ public final class ClusterVideoServer {
         return annexB.clone();
     }
 
-    private void setupSecondaryDisplayPresentationIfAvailable(Context context) {
-        DisplayManager dm = (DisplayManager) context.getSystemService(Context.DISPLAY_SERVICE);
-        if (dm == null) return;
-        Display[] displays = dm.getDisplays();
-        if (displays == null || displays.length <= 1) {
-            Log.i(TAG, "Single display detected; streaming Cluster video exclusively over TCP :" + activeTcpPort);
-            return;
-        }
-
-        Display secondary = displays[1];
-        Log.i(TAG, "Secondary display detected (" + secondary.getName() + "); launching ClusterPresentation");
-        try {
-            clusterPresentation = new ClusterPresentation(context, secondary, this::initSecondaryDecoder);
-            clusterPresentation.show();
-        } catch (Exception e) {
-            Log.w(TAG, "Could not show ClusterPresentation on secondary display", e);
-        }
-    }
-
-    private synchronized void initSecondaryDecoder(Surface surface) {
-        releaseSecondaryCodecOnly();
-        try {
-            secondaryCodec = MediaCodec.createDecoderByType(MIME_AVC);
-            MediaFormat format = MediaFormat.createVideoFormat(MIME_AVC, clusterWidth, clusterHeight);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1);
-            }
-            synchronized (codecConfigLock) {
-                if (cachedSpsPpsAnnexB != null) {
-                    format.setByteBuffer("csd-0", ByteBuffer.wrap(cachedSpsPpsAnnexB));
-                }
-            }
-            secondaryCodec.configure(format, surface, null, 0);
-            secondaryCodec.start();
-            secondaryCodecConfigured.set(true);
-            Log.i(TAG, "Secondary Presentation MediaCodec(video/avc) started (" + clusterWidth + "x" + clusterHeight + ")");
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to initialize secondary Presentation MediaCodec", e);
-            secondaryCodecConfigured.set(false);
-        }
-    }
-
-    private void decodeToSecondaryDisplay(byte[] annexB, boolean isCodecConfig) {
-        if (!secondaryCodecConfigured.get() || secondaryCodec == null) return;
-        synchronized (this) {
-            if (secondaryCodec == null) return;
-            try {
-                int inIdx = secondaryCodec.dequeueInputBuffer(2000);
-                if (inIdx >= 0) {
-                    ByteBuffer inBuf = secondaryCodec.getInputBuffer(inIdx);
-                    if (inBuf != null) {
-                        inBuf.clear();
-                        inBuf.put(annexB);
-                        int flags = isCodecConfig ? MediaCodec.BUFFER_FLAG_CODEC_CONFIG : 0;
-                        secondaryCodec.queueInputBuffer(inIdx, 0, annexB.length, System.nanoTime() / 1000, flags);
-                    }
-                }
-                MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
-                int outIdx = secondaryCodec.dequeueOutputBuffer(info, 0);
-                while (outIdx >= 0) {
-                    secondaryCodec.releaseOutputBuffer(outIdx, true);
-                    outIdx = secondaryCodec.dequeueOutputBuffer(info, 0);
-                }
-            } catch (Exception e) {
-                Log.w(TAG, "Secondary display MediaCodec decode error", e);
-            }
-        }
-    }
-
-    private synchronized void releaseSecondaryCodecOnly() {
-        secondaryCodecConfigured.set(false);
-        if (secondaryCodec != null) {
-            try {
-                secondaryCodec.stop();
-            } catch (Exception ignored) {}
-            try {
-                secondaryCodec.release();
-            } catch (Exception ignored) {}
-            secondaryCodec = null;
-        }
-    }
-
-    private void releaseSecondaryPresentation() {
-        releaseSecondaryCodecOnly();
-        if (clusterPresentation != null) {
-            try {
-                clusterPresentation.dismiss();
-            } catch (Exception ignored) {}
-            clusterPresentation = null;
-        }
-    }
-
     public static String resolveLocalIpAddress(Context context) {
         String fallbackIp = null;
         try {
@@ -466,43 +343,5 @@ public final class ClusterVideoServer {
             } catch (Exception ignored) {}
         }
         return fallbackIp != null ? fallbackIp : "192.168.43.1";
-    }
-
-    private interface SurfaceReadyCallback {
-        void onSurfaceReady(Surface surface);
-    }
-
-    private static final class ClusterPresentation extends Presentation {
-        private final SurfaceReadyCallback callback;
-
-        ClusterPresentation(Context outerContext, Display display, SurfaceReadyCallback callback) {
-            super(outerContext, display);
-            this.callback = callback;
-        }
-
-        @Override
-        protected void onCreate(Bundle savedInstanceState) {
-            super.onCreate(savedInstanceState);
-            FrameLayout root = new FrameLayout(getContext());
-            SurfaceView sv = new SurfaceView(getContext());
-            sv.setLayoutParams(new FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-            ));
-            sv.getHolder().addCallback(new SurfaceHolder.Callback() {
-                @Override
-                public void surfaceCreated(SurfaceHolder holder) {
-                    callback.onSurfaceReady(holder.getSurface());
-                }
-
-                @Override
-                public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {}
-
-                @Override
-                public void surfaceDestroyed(SurfaceHolder holder) {}
-            });
-            root.addView(sv);
-            setContentView(root);
-        }
     }
 }

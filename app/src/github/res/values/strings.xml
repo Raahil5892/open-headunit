@@ -12,4 +12,17 @@
     <string name="keep_dummy_vpn_description">Brings this app’s offline VPN up while a phone is connected. Intended for units on 2.4 GHz or with periodic audio and video stutters: it stops the head unit’s WiFi chip from looking for other networks. While it is on, other apps on this head unit have no internet. Applies on the next connection.</string>
     <string name="keep_dummy_vpn_summary">Keep the offline VPN up while a phone is connected. Other apps lose internet.</string>
     <string name="keep_dummy_vpn_denied">VPN permission denied. The offline VPN cannot be brought up automatically.</string>
+    <string name="enable_cluster_display">Enable Virtual Cockpit Cluster Stream</string>
+    <string name="enable_cluster_display_summary">Stream secondary cluster display over TCP port 5289</string>
+    <string name="cluster_display_mode">Cluster Display Role</string>
+    <string name="cluster_display_mode_summary">Select Aux Map (Full Nav) or Cluster (OEM gauge mode)</string>
+    <string name="cluster_resolution">Cluster Video Resolution</string>
+    <string name="cluster_resolution_summary">Select 800x480 (fast decode) or 1280x720 (HD cluster)</string>
+    <string name="cluster_tcp_port">Cluster Stream TCP Port</string>
+    <string name="cluster_tcp_port_summary">TCP port for H.264 Annex-B cluster stream (default 5289)</string>
+    <string name="cluster_stream_endpoint">Cluster Stream Endpoint &amp; Receiver</string>
+    <string name="open_cluster_receiver_mode">Open Cluster Receiver Mode</string>
+    <string name="open_cluster_receiver_mode_desc">Launch full-screen H.264 TCP :5289 Cluster Receiver</string>
+    <string name="shortcut_cluster_receiver_short">Cluster Mode</string>
 </resources>
+
