@@ -12,9 +12,48 @@
 Open Headunit is an Android app that allows you to turn your Android tablet or phone into an Android Auto receiver. This project is a revived version of the original headunit project by the great Michael Reid. The original project can be found here:
 https://github.com/mikereidis/headunit
 
-It runs on Android 4.1 and newer (Android 5.0 and newer for the Play Store build). Besides the stores above, you can download APKs from the [Releases page](https://github.com/andreknieriem/open-headunit/releases).
+It runs on Android 4.1 and newer (Android 5.0 and newer for the Play Store build). Besides the stores above, you can download pre-built Virtual Cockpit APKs from this fork's [Releases page](https://github.com/Raahil5892/open-headunit/releases) (or upstream builds from [andreknieriem/open-headunit](https://github.com/andreknieriem/open-headunit/releases)).
 
-**Contents:** [How to use](#how-to-use) · [Known Issues](#known-issues) · [Planned](#planned) · [Changelog](#changelog) · [Contributing](#contributing)
+**Contents:** [Virtual Cockpit Cluster Features](#virtual-cockpit-dual-display-cluster-fork) · [How to use](#how-to-use) · [Known Issues](#known-issues) · [Planned](#planned) · [Changelog](#changelog) · [Contributing](#contributing)
+
+---
+
+## Virtual Cockpit Dual-Display Cluster Fork
+
+This fork ([`Raahil5892/open-headunit`](https://github.com/Raahil5892/open-headunit), forked from [`andreknieriem/open-headunit`](https://github.com/andreknieriem/open-headunit)) adds **dual-screen Android Auto projection**, allowing a single phone to stream the full infotainment UI to your center head unit **and** a live secondary navigation/cluster video feed to a spare phone or screen mounted behind the steering wheel.
+
+> **Latest Build:** Download the pre-built APK from the [**Releases page**](https://github.com/Raahil5892/open-headunit/releases) (latest: [`v4.0.0-cluster3`](https://github.com/Raahil5892/open-headunit/releases/tag/v4.0.0-cluster3)).
+
+### What This Fork Adds
+
+1. **Dual-Channel Android Auto Multi-Display Negotiation (`ServiceDiscoveryResponse.kt`, `Channel.kt`, `AapControl.kt`)**
+   - Advertises a secondary video sink on `Channel.ID_CLU` (`14`, `display_id = 1`) alongside the primary infotainment display on `Channel.ID_VID` (`2`, `display_id = 0`).
+   - Pairs every display 1:1 with a matching `InputSourceService` (`Channel.ID_INP = 3` for `display_id = 0` and input-less `Channel.ID_CLU_INP = 15` for `display_id = 1`), satisfying Android Auto 17.3+'s multi-display topology validator across **USB**, **Wi-Fi / Headunit Server**, and **Self Mode**.
+   - Replies to cluster channel setup with `maxUnacked = 10` and `VIDEO_FOCUS_PROJECTED_NO_INPUT_FOCUS`, and handles `Channel.ID_CLU` H.264 reassembly + `MediaAck` flow control independently in `AapClusterVideo`.
+
+2. **Two Selectable Cluster Display Roles & Resolutions (`Settings → Graphic`)**
+   - **Aux Map (Full Nav)** *(default)*: Advertises `DISPLAY_TYPE_AUXILIARY (2)` + `KEYCODE_NAVIGATION (65538)`, forcing Android Auto to render the full **Google Maps** navigation view (with active route + turn-by-turn guidance) on the cluster screen regardless of phone battery-saver state.
+   - **Cluster (OEM)**: Advertises `DISPLAY_TYPE_CLUSTER (1)`, letting Android Auto's phone-side cluster policy choose between the cluster map, compact turn cards, or third-party `CATEGORY_PROJECTION_NAVIGATION` services.
+   - **Cluster Video Resolution**: Switch between **`800x480`** (lowest latency / fastest hardware decode) and **`1280x720`** (HD gauge cluster).
+
+3. **Zero-Latency TCP H.264 Annex-B Relay (`ClusterVideoServer.java`)**
+   - Runs a non-blocking TCP relay on port **`5289`** (configurable in Settings; moved off `5288` so it never collides with Native Wireless AA's `WirelessServer`).
+   - Caches `SPS`/`PPS` NAL units so newly connected cluster receivers initialize immediately, and appends an Annex-B Access Unit Delimiter (`00 00 00 01 09 F0`) after every frame for instant first-frame flush.
+   - Reads directly from Open Headunit's `"settings"` store and never allocates a second local `MediaCodec` or `Presentation` window on the head unit tablet, keeping **Self Mode** and primary projection conflict-free.
+
+4. **Built-In Companion Cluster Receiver (`ClusterReceiverActivity.kt`)**
+   - Install the same APK on your cluster phone and launch **Cluster Receiver Mode** from **Home**, **Settings → Graphic → Cluster Stream Endpoint & Receiver**, or the **Cluster Mode** app icon shortcut.
+   - **Auto-Gateway Detection**: Automatically detects the Wi-Fi hotspot gateway IP via `ConnectivityManager.getLinkProperties()` / `WifiManager.dhcpInfo.gateway` and persists custom IP/Port overrides in `SharedPreferences`.
+   - **Edge-to-Edge Notch Support & Scaling Toggle**: Uses `LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES` (API 28+) and lets you switch between **Stretch (Full 20:9)** and **Fit (16:9 Aspect)** via single-tap or long-press.
+   - **Auto-Hiding Status Pill**: Shows `"Connecting to Cluster at <IP>:5289... Tap screen to change IP"` until the first H.264 frame renders, and supports both 3-byte (`00 00 01`) and 4-byte (`00 00 00 01`) Annex-B start codes.
+
+5. **Graphic Settings UI (`SettingsFragment.kt` & `SettingsPendingCopy.kt`)**
+   - Adds **Enable Virtual Cockpit Cluster Stream**, **Cluster Display Role**, **Cluster Video Resolution**, **Cluster Stream TCP Port**, and **Cluster Stream Endpoint & Receiver** (`<IP>:5289 • Launch Receiver`) to both the **Basic** and **Advanced** Graphic settings tabs.
+
+### Dual-Display Quickstart (3-Device Setup)
+1. **Network**: Connect your **Head Unit Tablet** and **Cluster Phone** to the same local Wi-Fi / hotspot (e.g., your host phone's hotspot).
+2. **Head Unit Tablet**: Open **Open Headunit** → **Settings → Graphic** and verify **Enable Virtual Cockpit Cluster Stream** is **ON**, **Cluster Display Role** is **Aux Map (Full Nav)**, and **Video Codec** is **H.264** (if your tablet has an older decoder). Connect to your phone via **USB**, **Wi-Fi / Headunit Server**, or **Self Mode**.
+3. **Cluster Phone**: Open **Open Headunit** → **Settings → Graphic → Cluster Stream Endpoint & Receiver** (or long-press the app icon → **Cluster Mode**). It will auto-detect the head unit's gateway IP on port `5289` (or tap the screen to enter the head unit's IP shown in Settings) and start displaying the live cluster map.
 
 ## NOTE!
 **Android Auto 17.4 and newer can prevent legacy wireless triggers from launching projection, including Self-Mode and automated startup via Wireless Helper. Rooted devices have a workaround: re-enable Android Auto's wireless startup receiver.**
