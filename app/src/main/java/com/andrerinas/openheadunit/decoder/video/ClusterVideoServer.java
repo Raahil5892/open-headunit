@@ -44,6 +44,7 @@ public final class ClusterVideoServer {
     public static final String SETTINGS_PREFS_NAME = "settings";
     public static final int DEFAULT_CLUSTER_TCP_PORT = 5289;
     public static final int CLUSTER_TCP_PORT = DEFAULT_CLUSTER_TCP_PORT;
+    private static final byte[] AUD_NAL = new byte[]{0x00, 0x00, 0x00, 0x01, 0x09, (byte) 0xF0};
 
     public static final String PREF_ENABLE_CLUSTER_DISPLAY = "enable_cluster_display";
     public static final String PREF_CLUSTER_RESOLUTION = "cluster_resolution";
@@ -185,6 +186,7 @@ public final class ClusterVideoServer {
                         try {
                             OutputStream os = client.getOutputStream();
                             os.write(cachedSpsPpsAnnexB);
+                            os.write(AUD_NAL);
                             os.flush();
                             Log.i(TAG, "Sent cached SPS/PPS Annex-B header (" + cachedSpsPpsAnnexB.length + " bytes) to new client");
                         } catch (IOException e) {
@@ -233,6 +235,7 @@ public final class ClusterVideoServer {
             try {
                 OutputStream os = client.getOutputStream();
                 os.write(annexBFrame);
+                os.write(AUD_NAL);
                 os.flush();
             } catch (IOException e) {
                 Log.w(TAG, "Cluster client disconnected (" + client.getRemoteSocketAddress() + "): " + e.getMessage());

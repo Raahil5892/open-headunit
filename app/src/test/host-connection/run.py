@@ -152,7 +152,7 @@ class AapTransport(
  private val terminated=CountDownLatch(1)
  private var retiringWorkers:List<Thread> = emptyList()
  val aapAudio=AapAudio(audioDecoder,settings)
- val aapVideo=AapVideo();val ssl=externalSsl
+ val aapVideo=AapVideo();val aapClusterVideo=AapClusterVideo();val ssl=externalSsl
  var onQuit:((Boolean)->Unit)?=null
  var onAudioFocusStateChanged:((Boolean)->Unit)?=null
  var onUpdateUiConfigReplyReceived:(()->Unit)?=null
@@ -244,6 +244,7 @@ class AudioConfig{val enabled=true;val staticFocus=false;val focusMode=0}
 class DimState{ fun resetForNewSession(){} }
 class VideoDecoder{var framesRenderedThisSession=0L;fun beginSession(){framesRenderedThisSession=0L};var onDecoderError:((String)->Unit)?=null;var onKeyframeStarved:(()->Unit)?=null;var onFrameDropped:(()->Unit)?=null;var onKeyframeObserved:(()->Unit)?=null;fun stop(s:String){}}
 class AapVideo{fun release(){}}
+class AapClusterVideo{fun release(){}}
 object ProjectionHealthRecorder{fun reset(){}}
 open class AapRead{@Volatile protected var isStopped=false;fun stop(){isStopped=true;retirePresentation()};var onRetirePresentation:(()->Unit)?=null;fun retirePresentation(){onRetirePresentation?.invoke()};companion object{var creations=0};object Factory{
  fun create(connection:ProjectionConnection,transport:AapTransport,mic:Any,audio:AapAudio,video:AapVideo,
