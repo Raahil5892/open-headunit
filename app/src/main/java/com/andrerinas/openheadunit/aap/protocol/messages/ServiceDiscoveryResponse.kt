@@ -140,6 +140,18 @@ internal class ServiceDiscoveryResponse(context: Context, audioConfig: AudioSess
                         }.build())
                     }
 
+                    if (settings.enableClusterDisplay) {
+                        // Android Auto 17.3+ multi-display topology validator (jnb.java:223-308) requires
+                        // explicit display_id=0 (field 6) and display_type=DISPLAY_TYPE_MAIN=0 (field 7)
+                        // on the primary video service whenever a secondary display is advertised.
+                        mediaSinkServiceBuilder.setUnknownFields(
+                            com.google.protobuf.UnknownFieldSet.newBuilder()
+                                .addField(6, com.google.protobuf.UnknownFieldSet.Field.newBuilder().addVarint(0L).build())
+                                .addField(7, com.google.protobuf.UnknownFieldSet.Field.newBuilder().addVarint(Channel.DISPLAY_TYPE_MAIN.toLong()).build())
+                                .build()
+                        )
+                    }
+
                 }.build()
             }.build()
 
@@ -158,34 +170,43 @@ internal class ServiceDiscoveryResponse(context: Context, audioConfig: AudioSess
                 } else {
                     Control.Service.MediaSinkService.VideoConfiguration.VideoCodecResolutionType._800x480
                 }
+                val clusterDensity = if (settings.clusterResolution == "1280x720") 160 else 140
+                val isAuxMap = settings.clusterDisplayMode != "CLUSTER"
+                val displayTypeVal = if (isAuxMap) {
+                    Channel.DISPLAY_TYPE_AUXILIARY.toLong()
+                } else {
+                    Channel.DISPLAY_TYPE_CLUSTER.toLong()
+                }
                 val clusterVideo = Control.Service.newBuilder().also { service ->
                     service.id = Channel.ID_CLU
                     service.mediaSinkService = Control.Service.MediaSinkService.newBuilder().also { clusterSink ->
                         clusterSink.availableType = Media.MediaCodecType.MEDIA_CODEC_VIDEO_H264_BP
-                        clusterSink.audioType = Media.AudioStreamType.NONE
-                        clusterSink.availableWhileInCall = true
                         clusterSink.addVideoConfigs(
                             Control.Service.MediaSinkService.VideoConfiguration.newBuilder().apply {
                                 codecResolution = clusterRes
                                 frameRate = Control.Service.MediaSinkService.VideoConfiguration.VideoFrameRateType._30
-                                setDensity(160)
-                                setPixelAspectRatioE4(10000)
                                 setMarginWidth(0)
                                 setMarginHeight(0)
+                                setDensity(clusterDensity)
                                 setVideoCodecType(Media.MediaCodecType.MEDIA_CODEC_VIDEO_H264_BP)
                             }.build()
                         )
-                        // Inject AVChannel field 6 (display_id = 1) and field 7 (display_type = DISPLAY_TYPE_CLUSTER = 1)
-                        clusterSink.setUnknownFields(
-                            com.google.protobuf.UnknownFieldSet.newBuilder()
-                                .addField(6, com.google.protobuf.UnknownFieldSet.Field.newBuilder().addVarint(1L).build())
-                                .addField(7, com.google.protobuf.UnknownFieldSet.Field.newBuilder().addVarint(Channel.DISPLAY_TYPE_CLUSTER.toLong()).build())
-                                .build()
-                        )
+                        // Inject AVChannel field 6 (display_id = 1), field 7 (display_type = AUXILIARY(2) or CLUSTER(1)),
+                        // and field 8 (keycode = KEYCODE_NAVIGATION = 65538 when AUXILIARY)
+                        val unknownBuilder = com.google.protobuf.UnknownFieldSet.newBuilder()
+                            .addField(6, com.google.protobuf.UnknownFieldSet.Field.newBuilder().addVarint(1L).build())
+                            .addField(7, com.google.protobuf.UnknownFieldSet.Field.newBuilder().addVarint(displayTypeVal).build())
+                        if (isAuxMap) {
+                            unknownBuilder.addField(
+                                8,
+                                com.google.protobuf.UnknownFieldSet.Field.newBuilder().addVarint(Channel.KEYCODE_NAVIGATION.toLong()).build()
+                            )
+                        }
+                        clusterSink.setUnknownFields(unknownBuilder.build())
                     }.build()
                 }.build()
                 services.add(clusterVideo)
-                AppLog.i("[ServiceDiscovery] Announced Cluster AVChannel (id=${Channel.ID_CLU}, display_type=${Channel.DISPLAY_TYPE_CLUSTER}, res=${settings.clusterResolution})")
+                AppLog.i("[ServiceDiscovery] Announced Cluster AVChannel (id=${Channel.ID_CLU}, display_id=1, display_type=$displayTypeVal, mode=${settings.clusterDisplayMode}, res=${settings.clusterResolution})")
             }
 
             val input = Control.Service.newBuilder().also { service ->
@@ -194,6 +215,14 @@ internal class ServiceDiscoveryResponse(context: Context, audioConfig: AudioSess
                     it.touchscreen = Control.Service.InputSourceService.TouchConfig.newBuilder().apply {
                         setWidth(geometry.width) // Use negotiated width
                         setHeight(geometry.height) // Use negotiated height
+                        if (settings.enableClusterDisplay) {
+                            // TouchConfig field 3: display_type = DISPLAY_TYPE_MAIN (0)
+                            setUnknownFields(
+                                com.google.protobuf.UnknownFieldSet.newBuilder()
+                                    .addField(3, com.google.protobuf.UnknownFieldSet.Field.newBuilder().addVarint(Channel.DISPLAY_TYPE_MAIN.toLong()).build())
+                                    .build()
+                            )
+                        }
                     }.build()
 
                     if (settings.enableRotary) {
@@ -205,10 +234,37 @@ internal class ServiceDiscoveryResponse(context: Context, audioConfig: AudioSess
                     }
 
                     it.addAllKeycodesSupported(KeyCode.supported)
+
+                    if (settings.enableClusterDisplay) {
+                        // InputSourceService field 5: display_id = 0 (joins with MAIN video display_id = 0)
+                        it.setUnknownFields(
+                            com.google.protobuf.UnknownFieldSet.newBuilder()
+                                .addField(5, com.google.protobuf.UnknownFieldSet.Field.newBuilder().addVarint(0L).build())
+                                .build()
+                        )
+                    }
                 }.build()
             }.build()
 
             services.add(input)
+
+            if (settings.enableClusterDisplay) {
+                // Android Auto 17.3+ topology validator (jnb.java:251-308) strictly requires every
+                // advertised CarDisplayId to have a 1:1 matching InputSourceService with the same
+                // display_id (field 5), even when the secondary cluster display has no touch/key inputs.
+                val clusterInput = Control.Service.newBuilder().also { service ->
+                    service.id = Channel.ID_CLU_INP
+                    service.inputSourceService = Control.Service.InputSourceService.newBuilder().also { clusterInputBuilder ->
+                        clusterInputBuilder.setUnknownFields(
+                            com.google.protobuf.UnknownFieldSet.newBuilder()
+                                .addField(5, com.google.protobuf.UnknownFieldSet.Field.newBuilder().addVarint(1L).build())
+                                .build()
+                        )
+                    }.build()
+                }.build()
+                services.add(clusterInput)
+                AppLog.i("[ServiceDiscovery] Announced Cluster InputSourceService (id=${Channel.ID_CLU_INP}, display_id=1)")
+            }
 
             val audioType = if (announcesAac(context, settings, audioConfig.aac)) Media.MediaCodecType.MEDIA_CODEC_AUDIO_AAC_LC else Media.MediaCodecType.MEDIA_CODEC_AUDIO_PCM
 

@@ -48,9 +48,10 @@ jobs:
       - name: Build Debug APK (assembleGithubDebug)
         run: ./gradlew assembleGithubDebug --no-daemon --stacktrace
 
-      - name: Copy APK with descriptive cluster name
+      - name: Copy APK with descriptive cluster names
         run: |
-          cp app/build/outputs/apk/github/debug/*.apk app/build/outputs/apk/github/debug/open-headunit-virtual-cockpit-v4.0.0-cluster2-debug.apk
+          cp app/build/outputs/apk/github/debug/app-github-debug.apk app/build/outputs/apk/github/debug/open-headunit-virtual-cockpit-v4.0.0-cluster2-debug.apk
+          cp app/build/outputs/apk/github/debug/app-github-debug.apk app/build/outputs/apk/github/debug/open-headunit-virtual-cockpit-v4.0.0-cluster3-debug.apk
           ls -lh app/build/outputs/apk/github/debug/
 
       - name: Upload APK Artifact
@@ -65,13 +66,30 @@ jobs:
         with:
           tag_name: v4.0.0-cluster2
           target_commitish: ${{ github.sha }}
-          name: "Open Headunit Virtual Cockpit v4.0.0-cluster2 (MainActivity Fix, Port 5289 & Auto-Gateway)"
+          name: "Open Headunit Virtual Cockpit v4.0.0-cluster2 (Fixed Multi-Display Input Pairing & Android 17 Cluster Topology)"
           body: |
-            ### Open Headunit Virtual Cockpit (v4.0.0-cluster2)
-            - Fixed Black Screen on App Launch (AndroidManifest.xml & ClusterReceiverActivity.kt): Kept .main.MainActivity as the sole primary MAIN/LAUNCHER activity so opening the app launches HomeFragment instead of an unconnected ClusterReceiverActivity SurfaceView, and added an Exit to Head Unit Home button inside the cluster receiver dialog.
-            - Port 5289 Migration (ClusterVideoServer.java & ClusterReceiverActivity.kt): Moved Cluster TCP Annex-B relay from port 5288 to 5289 (and made clusterPort configurable in Settings) so Native Wireless AA (WirelessServer on 5288) and Cluster streaming never collide.
-            - Smart Gateway Auto-Detection, Floating Overlay & Notch Cutout (ClusterReceiverActivity.kt): Auto-detects the Wi-Fi hotspot gateway IP from ConnectivityManager.getLinkProperties() / WifiManager.dhcpInfo.gateway, persists user overrides in SharedPreferences, shows an auto-hiding status overlay, and sets LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES.
-            - Basic & Advanced Graphic Settings UI (SettingsFragment.kt & SettingsPendingCopy.kt): Added enableClusterDisplay, clusterResolution (800x480 vs 1280x720), clusterPort, and clusterStreamEndpoint to both the Graphic section and basicSettingIds.
+            ### Open Headunit Virtual Cockpit (`v4.0.0-cluster2` / `v4.0.0-cluster3`)
+            - **Fixed Multi-Display `ServiceDiscoveryResponse` Topology for Android Auto 17 (`ServiceDiscoveryResponse.kt`, `Channel.kt`, `AapControl.kt`, `VideoFocusEvent.kt`)**:
+              - Added paired `Channel.ID_CLU_INP` (`15`) `InputSourceService` with `display_id = 1` (field 5) alongside `Channel.ID_CLU` (`14`) `MediaSinkService` (`display_id = 1`), and stamped explicit `display_id = 0` / `display_type = DISPLAY_TYPE_MAIN (0)` on primary `Channel.ID_VID` (`2`) and `Channel.ID_INP` (`3`) when `enableClusterDisplay` is active. Android Auto 17's multi-display topology validator (`jnb.java:223-308`) strictly requires a 1:1 `InputSourceService` per advertised `CarDisplayId`, even when the cluster screen has no touch input.
+              - Added `Cluster Display Role` (`Aux Map (Full Nav)` vs `Cluster (OEM)`) in **Settings → Graphic** (`DISPLAY_TYPE_AUXILIARY = 2` + `KEYCODE_NAVIGATION = 65538` vs `DISPLAY_TYPE_CLUSTER = 1`).
+              - Updated `Channel.ID_CLU` setup response to use `maxUnacked = 10` and `VIDEO_FOCUS_PROJECTED_NO_INPUT_FOCUS` (`unsolicited = false`).
+          files: |
+            app/build/outputs/apk/github/debug/*.apk
+          draft: false
+          prerelease: false
+
+      - name: Publish GitHub Release v4.0.0-cluster3
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v4.0.0-cluster3
+          target_commitish: ${{ github.sha }}
+          name: "Open Headunit Virtual Cockpit v4.0.0-cluster3 (Fixed Multi-Display Input Pairing & Android 17 Cluster Topology)"
+          body: |
+            ### Open Headunit Virtual Cockpit (`v4.0.0-cluster3`)
+            - **Fixed Multi-Display `ServiceDiscoveryResponse` Topology for Android Auto 17 (`ServiceDiscoveryResponse.kt`, `Channel.kt`, `AapControl.kt`, `VideoFocusEvent.kt`)**:
+              - Added paired `Channel.ID_CLU_INP` (`15`) `InputSourceService` with `display_id = 1` (field 5) alongside `Channel.ID_CLU` (`14`) `MediaSinkService` (`display_id = 1`), and stamped explicit `display_id = 0` / `display_type = DISPLAY_TYPE_MAIN (0)` on primary `Channel.ID_VID` (`2`) and `Channel.ID_INP` (`3`) when `enableClusterDisplay` is active. Android Auto 17's multi-display topology validator (`jnb.java:223-308`) strictly requires a 1:1 `InputSourceService` per advertised `CarDisplayId`, even when the cluster screen has no touch input.
+              - Added `Cluster Display Role` (`Aux Map (Full Nav)` vs `Cluster (OEM)`) in **Settings → Graphic** (`DISPLAY_TYPE_AUXILIARY = 2` + `KEYCODE_NAVIGATION = 65538` vs `DISPLAY_TYPE_CLUSTER = 1`).
+              - Updated `Channel.ID_CLU` setup response to use `maxUnacked = 10` and `VIDEO_FOCUS_PROJECTED_NO_INPUT_FOCUS` (`unsolicited = false`).
           files: |
             app/build/outputs/apk/github/debug/*.apk
           draft: false

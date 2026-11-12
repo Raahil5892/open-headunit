@@ -162,7 +162,7 @@ class SettingsFragment : Fragment() {
         "gpsNavigation",
         // Graphic
         "resolution", "dpiPixelDensity", "viewMode", "screenOrientation", "startInFullscreenMode",
-        "enableClusterDisplay", "clusterResolution", "clusterPort", "clusterStreamEndpoint",
+        "enableClusterDisplay", "clusterDisplayMode", "clusterResolution", "clusterPort", "clusterStreamEndpoint",
         // Theming
         "loadingScreen", "customization",
         // Video
@@ -268,6 +268,7 @@ class SettingsFragment : Fragment() {
     private var pendingForcedScale by pending::forcedScale
     private var pendingHudMirroring by pending::hudMirroring
     private var pendingEnableClusterDisplay by pending::enableClusterDisplay
+    private var pendingClusterDisplayMode by pending::clusterDisplayMode
     private var pendingClusterResolution by pending::clusterResolution
     private var pendingClusterPort by pending::clusterPort
 
@@ -695,6 +696,7 @@ class SettingsFragment : Fragment() {
         pendingForcedScale?.let { if (it != settings.forcedScale) settings.forcedScale = it }
         pendingHudMirroring?.let { if (it != settings.hudMirroring) settings.hudMirroring = it }
         pendingEnableClusterDisplay?.let { if (it != settings.enableClusterDisplay) settings.enableClusterDisplay = it }
+        pendingClusterDisplayMode?.let { if (it != settings.clusterDisplayMode) settings.clusterDisplayMode = it }
         pendingClusterResolution?.let { if (it != settings.clusterResolution) settings.clusterResolution = it }
         pendingClusterPort?.let { if (it != settings.clusterPort) settings.clusterPort = it }
 
@@ -1675,6 +1677,25 @@ class SettingsFragment : Fragment() {
                 } else {
                     com.andrerinas.openheadunit.decoder.video.ClusterVideoServer.getInstance().stop()
                 }
+                checkChanges()
+                updateSettingsList()
+            }
+        ))
+
+        val clusterModeOptions = listOf("Aux Map (Full Nav)", "Cluster (OEM)")
+        val currentClusterMode = pendingClusterDisplayMode ?: settings.clusterDisplayMode
+        val clusterModeIndex = if (currentClusterMode == "CLUSTER") 1 else 0
+
+        items.add(SettingItem.SegmentedButtonSettingEntry(
+            stableId = "clusterDisplayMode",
+            nameResId = R.string.cluster_display_mode,
+            options = clusterModeOptions,
+            selectedIndex = clusterModeIndex,
+            helpResId = R.string.cluster_display_mode_summary,
+            onOptionSelected = { index ->
+                val chosenMode = if (index == 1) "CLUSTER" else "AUX_MAP"
+                pendingClusterDisplayMode = chosenMode
+                settings.clusterDisplayMode = chosenMode
                 checkChanges()
                 updateSettingsList()
             }
