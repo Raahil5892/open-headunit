@@ -1491,9 +1491,6 @@ class CommManager(
         // the surface-mismatch path this serves without it.
         if (!projectionVideoFocusSuppressed) {
             send(com.andrerinas.openheadunit.aap.protocol.messages.VideoFocusEvent(gain = true, unsolicited = true))
-            if (settings.enableClusterDisplay) {
-                send(com.andrerinas.openheadunit.aap.protocol.messages.VideoFocusEvent(gain = true, unsolicited = true, channel = com.andrerinas.openheadunit.aap.protocol.Channel.ID_CLU))
-            }
         }
     }
 

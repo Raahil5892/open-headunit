@@ -139,12 +139,7 @@ internal class ServiceDiscoveryResponse(context: Context, audioConfig: AudioSess
                             setVideoCodecType(effectiveCodec)
                         }.build())
                     }
-                    mediaSinkServiceBuilder.setUnknownFields(
-                        com.google.protobuf.UnknownFieldSet.newBuilder()
-                            .addField(6, com.google.protobuf.UnknownFieldSet.Field.newBuilder().addVarint(0L).build())
-                            .addField(7, com.google.protobuf.UnknownFieldSet.Field.newBuilder().addVarint(Channel.DISPLAY_TYPE_MAIN.toLong()).build())
-                            .build()
-                    )
+
                 }.build()
             }.build()
 
