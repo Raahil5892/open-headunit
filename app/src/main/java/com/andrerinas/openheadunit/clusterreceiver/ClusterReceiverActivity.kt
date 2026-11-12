@@ -550,10 +550,22 @@ class ClusterReceiverActivity : Activity(), SurfaceHolder.Callback {
             if (nalStart < 0) continue
 
             while (true) {
-                val nextStart = findStartCode(bytes, nalStart + 4)
+                val startLen = startCodeLength(bytes, nalStart)
+                val nextStart = findStartCode(bytes, nalStart + startLen)
                 if (nextStart < 0) break
 
-                val nalUnit = bytes.copyOfRange(nalStart, nextStart)
+                val rawSlice = bytes.copyOfRange(nalStart, nextStart)
+                val nalUnit = if (startLen == 3) {
+                    ByteArray(rawSlice.size + 1).also {
+                        it[0] = 0
+                        it[1] = 0
+                        it[2] = 0
+                        it[3] = 1
+                        System.arraycopy(rawSlice, 3, it, 4, rawSlice.size - 3)
+                    }
+                } else {
+                    rawSlice
+                }
                 feedNalToDecoder(codec, nalUnit, bufferInfo)
                 nalStart = nextStart
             }
@@ -563,16 +575,29 @@ class ClusterReceiverActivity : Activity(), SurfaceHolder.Callback {
         }
     }
 
+    private fun startCodeLength(data: ByteArray, index: Int): Int {
+        if (index + 4 <= data.size &&
+            data[index].toInt() == 0 &&
+            data[index + 1].toInt() == 0 &&
+            data[index + 2].toInt() == 0 &&
+            data[index + 3].toInt() == 1
+        ) {
+            return 4
+        }
+        return 3
+    }
+
     private fun findStartCode(data: ByteArray, fromIndex: Int): Int {
         var i = fromIndex
-        val limit = data.size - 4
+        val limit = data.size - 3
         while (i <= limit) {
-            if (data[i].toInt() == 0 &&
-                data[i + 1].toInt() == 0 &&
-                data[i + 2].toInt() == 0 &&
-                data[i + 3].toInt() == 1
-            ) {
-                return i
+            if (data[i].toInt() == 0 && data[i + 1].toInt() == 0) {
+                if (data[i + 2].toInt() == 1) {
+                    return i
+                }
+                if (i + 3 < data.size && data[i + 2].toInt() == 0 && data[i + 3].toInt() == 1) {
+                    return i
+                }
             }
             i++
         }
@@ -586,6 +611,11 @@ class ClusterReceiverActivity : Activity(), SurfaceHolder.Callback {
     ) {
         if (nalUnit.size <= 4) return
         val nalType = nalUnit[4].toInt() and 0x1F
+        if (nalType == 9) {
+            // Access Unit Delimiter (00 00 00 01 09 F0): drain any decoded frame immediately
+            drainDecoderOutput(codec, bufferInfo, 2_000)
+            return
+        }
         val isConfig = (nalType == 7 || nalType == 8)
 
         val inIdx = codec.dequeueInputBuffer(10_000)
@@ -597,12 +627,22 @@ class ClusterReceiverActivity : Activity(), SurfaceHolder.Callback {
             codec.queueInputBuffer(inIdx, 0, nalUnit.size, System.nanoTime() / 1000, flags)
         }
 
-        var outIdx = codec.dequeueOutputBuffer(bufferInfo, 0)
-        while (outIdx >= 0) {
-            codec.releaseOutputBuffer(outIdx, true)
-            if (firstFrameRendered.compareAndSet(false, true)) {
-                runOnUiThread {
-                    statusOverlay.visibility = View.GONE
+        drainDecoderOutput(codec, bufferInfo, if (isConfig) 0L else 1_000L)
+    }
+
+    private fun drainDecoderOutput(
+        codec: MediaCodec,
+        bufferInfo: MediaCodec.BufferInfo,
+        initialTimeoutUs: Long
+    ) {
+        var outIdx = codec.dequeueOutputBuffer(bufferInfo, initialTimeoutUs)
+        while (outIdx >= 0 || outIdx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+            if (outIdx >= 0) {
+                codec.releaseOutputBuffer(outIdx, true)
+                if (firstFrameRendered.compareAndSet(false, true)) {
+                    runOnUiThread {
+                        statusOverlay.visibility = View.GONE
+                    }
                 }
             }
             outIdx = codec.dequeueOutputBuffer(bufferInfo, 0)
