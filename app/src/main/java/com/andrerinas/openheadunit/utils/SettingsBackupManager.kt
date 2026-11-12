@@ -135,6 +135,10 @@ object SettingsBackupManager {
         "aa-exit-action" to ValueType.INT,
         "forced_scale" to ValueType.BOOLEAN,
         "hud_mirroring" to ValueType.BOOLEAN,
+        "enable_cluster_display" to ValueType.BOOLEAN,
+        "cluster_display_mode" to ValueType.STRING,
+        "cluster_resolution" to ValueType.STRING,
+        "cluster_port" to ValueType.INT,
         "ui-scale-home-percent" to ValueType.INT,
         "ui-scale-settings-percent" to ValueType.INT,
         "mic-sample-rate" to ValueType.INT,
@@ -350,7 +354,11 @@ object SettingsBackupManager {
         "device-specific-head-unit-model",
         "device-specific-pause-projection-on-reverse",
         "wifi-scan-enabled",
-        "wifi-scan-fyt-auto-start"
+        "wifi-scan-fyt-auto-start",
+        "enable_cluster_display",
+        "cluster_display_mode",
+        "cluster_resolution",
+        "cluster_port"
     )
 
     fun defaultFileName(): String {
