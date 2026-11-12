@@ -50,8 +50,9 @@ jobs:
 
       - name: Copy APK with descriptive cluster names
         run: |
-          cp app/build/outputs/apk/github/debug/app-github-debug.apk app/build/outputs/apk/github/debug/open-headunit-virtual-cockpit-v4.0.0-cluster2-debug.apk
-          cp app/build/outputs/apk/github/debug/app-github-debug.apk app/build/outputs/apk/github/debug/open-headunit-virtual-cockpit-v4.0.0-cluster3-debug.apk
+          SRC_APK=$(ls app/build/outputs/apk/github/debug/*.apk | head -n 1)
+          cp "$SRC_APK" app/build/outputs/apk/github/debug/open-headunit-virtual-cockpit-v4.0.0-cluster2-debug.apk
+          cp "$SRC_APK" app/build/outputs/apk/github/debug/open-headunit-virtual-cockpit-v4.0.0-cluster3-debug.apk
           ls -lh app/build/outputs/apk/github/debug/
 
       - name: Upload APK Artifact
