@@ -18,10 +18,12 @@ object Channel {
     const val ID_PHONE = 12
     const val ID_WIFI = 13
     const val ID_CLU = 14
+    const val ID_CLU_INP = 15
 
     const val DISPLAY_TYPE_MAIN = 0
     const val DISPLAY_TYPE_CLUSTER = 1
     const val DISPLAY_TYPE_AUXILIARY = 2
+    const val KEYCODE_NAVIGATION = 65538
 
     fun name(channel: Int): String {
         when (channel) {
@@ -39,6 +41,7 @@ object Channel {
             ID_NOTI -> return "NOTIFICATION"
             ID_PHONE -> return "PHONE_STATUS"
             ID_CLU -> return "CLUSTER_VIDEO"
+            ID_CLU_INP -> return "CLUSTER_INPUT"
         }
         return "UNK"
     }

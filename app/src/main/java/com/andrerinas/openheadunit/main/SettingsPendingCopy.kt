@@ -93,6 +93,7 @@ class SettingsPendingCopy {
     var forcedScale: Boolean? = null
     var hudMirroring: Boolean? = null
     var enableClusterDisplay: Boolean? = null
+    var clusterDisplayMode: String? = null
     var clusterResolution: String? = null
     var clusterPort: Int? = null
     var killOnDisconnect: Boolean? = null
@@ -188,6 +189,7 @@ class SettingsPendingCopy {
         forcedScale = settings.forcedScale
         hudMirroring = settings.hudMirroring
         enableClusterDisplay = settings.enableClusterDisplay
+        clusterDisplayMode = settings.clusterDisplayMode
         clusterResolution = settings.clusterResolution
         clusterPort = settings.clusterPort
         killOnDisconnect = settings.rawKillOnDisconnect
@@ -284,6 +286,7 @@ class SettingsPendingCopy {
         forcedScale != settings.forcedScale ||
         hudMirroring != settings.hudMirroring ||
         enableClusterDisplay != settings.enableClusterDisplay ||
+        clusterDisplayMode != settings.clusterDisplayMode ||
         clusterResolution != settings.clusterResolution ||
         clusterPort != settings.clusterPort ||
         killOnDisconnect != settings.rawKillOnDisconnect ||

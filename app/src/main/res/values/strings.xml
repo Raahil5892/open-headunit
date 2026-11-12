@@ -1923,6 +1923,8 @@
 
     <string name="enable_cluster_display">Enable Virtual Cockpit Cluster Stream</string>
     <string name="enable_cluster_display_summary">Negotiate secondary DISPLAY_TYPE_CLUSTER video channel and broadcast H.264 Annex-B over TCP port 5289 / Secondary Presentation</string>
+    <string name="cluster_display_mode">Cluster Display Role</string>
+    <string name="cluster_display_mode_summary">Aux Map (DISPLAY_TYPE_AUXILIARY + KEYCODE_NAVIGATION for full Google Maps cockpit view on Android 17+) or Cluster (DISPLAY_TYPE_CLUSTER)</string>
     <string name="cluster_resolution">Cluster Video Resolution</string>
     <string name="cluster_resolution_summary">Select 800x480 (fastest hardware decode) or 1280x720 (HD gauge cluster)</string>
     <string name="cluster_tcp_port">Cluster Stream TCP Port</string>

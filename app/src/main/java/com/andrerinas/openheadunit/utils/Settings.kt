@@ -2869,6 +2869,10 @@ class Settings(private val context: Context) {
         get() = prefs.getBoolean("enable_cluster_display", true)
         set(value) = prefs.edit().putBoolean("enable_cluster_display", value).apply()
 
+    var clusterDisplayMode: String
+        get() = prefs.getString("cluster_display_mode", "AUX_MAP") ?: "AUX_MAP"
+        set(value) = prefs.edit().putString("cluster_display_mode", value).apply()
+
     var clusterResolution: String
         get() = prefs.getString("cluster_resolution", "800x480") ?: "800x480"
         set(value) = prefs.edit().putString("cluster_resolution", value).apply()
